@@ -1,4 +1,5 @@
 import { MoreHorizontal, Star } from "lucide-react";
+import { FontPicker } from "#/components/font-picker";
 import { SaveStatus } from "#/components/save-status";
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
+        <FontPicker />
         <SaveStatus state={saveState} savedAt={doc.updatedAt} />
         <button
           type="button"
