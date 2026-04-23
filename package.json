@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run test -r && vp run build -r",
+    "dev": "vp run -F './apps/*' dev",
     "dev:fe": "vp run fe#dev",
     "dev:be": "vp run be#dev",
     "prepare": "vp config"

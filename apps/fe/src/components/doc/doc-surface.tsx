@@ -1,18 +1,14 @@
 import { Editor } from "#/components/editor/editor";
 import { useDocuments } from "#/stores/documents";
-import { DocEmoji } from "./doc-emoji";
-import { DocMeta } from "./doc-meta";
 
 export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolean) => void }) {
   const doc = useDocuments((s) => (s.selectedId ? s.docs[s.selectedId] : null));
-  const setEmoji = useDocuments((s) => s.setEmoji);
   const updateDoc = useDocuments((s) => s.updateDoc);
   const renameDoc = useDocuments((s) => s.renameDoc);
 
   if (!doc) {
     return (
       <div className="mx-auto max-w-[680px] px-6 pt-24 text-center text-[var(--sea-ink-soft)]">
-        <div className="mb-3 text-[42px]">🌊</div>
         <p className="font-['Fraunces',Georgia,serif] text-2xl text-[var(--sea-ink)]">
           Nothing selected yet
         </p>
@@ -25,8 +21,6 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
 
   return (
     <div className="mx-auto w-full max-w-[680px] px-6 pt-14 pb-20">
-      <DocEmoji emoji={doc.emoji} onChange={(e) => setEmoji(doc.id, e)} />
-      <DocMeta tag={doc.tag} updatedAt={doc.updatedAt} wordCount={doc.wordCount} />
       <Editor
         docId={doc.id}
         initialContent={doc.contentJson}
