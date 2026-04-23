@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@floating-ui/dom':
+      specifier: ^1.7.6
+      version: 1.7.6
     '@tiptap/extension-bubble-menu':
       specifier: ^3.22.4
       version: 3.22.4
@@ -106,6 +109,9 @@ importers:
       '@cloudflare/vite-plugin':
         specifier: ^1.26.0
         version: 1.33.1(@voidzero-dev/vite-plus-core@0.1.19(@types/node@22.19.17)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3))(workerd@1.20260421.1)(wrangler@4.84.1)
+      '@floating-ui/dom':
+        specifier: 'catalog:'
+        version: 1.7.6
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.2.4(@voidzero-dev/vite-plus-core@0.1.19(@types/node@22.19.17)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3))

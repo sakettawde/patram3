@@ -357,3 +357,102 @@ a {
     color: var(--foreground);
   }
 }
+
+.ProseMirror {
+  caret-color: var(--lagoon);
+  min-height: 40vh;
+}
+.ProseMirror:focus {
+  outline: none;
+}
+.ProseMirror h1 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 700;
+  font-size: 38px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--sea-ink);
+  margin: 0 0 10px;
+}
+.ProseMirror h2 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 22px;
+  color: var(--sea-ink);
+  margin: 26px 0 10px;
+  letter-spacing: -0.01em;
+}
+.ProseMirror h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 18px;
+  color: var(--sea-ink);
+  margin: 20px 0 8px;
+}
+.ProseMirror p {
+  margin: 0 0 16px;
+}
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 20px;
+}
+.ProseMirror blockquote {
+  border-left: 3px solid var(--lagoon);
+  padding-left: 14px;
+  color: var(--sea-ink-soft);
+  font-style: italic;
+}
+.ProseMirror mark {
+  background: rgba(79, 184, 178, 0.25);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 4px 0;
+}
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  margin-top: 6px;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before,
+.ProseMirror h1.is-empty::before,
+.ProseMirror p.is-empty::before {
+  color: var(--sea-ink-soft);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.patram-slash {
+  animation: slash-pop 120ms ease-out;
+  transform-origin: top left;
+}
+@keyframes slash-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes emoji-spring {
+  0% {
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
