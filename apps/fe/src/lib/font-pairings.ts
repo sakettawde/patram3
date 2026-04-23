@@ -15,6 +15,13 @@ export const FONT_PAIRINGS: FontPairing[] = [
     body: "'Manrope', ui-sans-serif, system-ui, sans-serif",
   },
   {
+    id: "evergreen",
+    name: "Evergreen",
+    description: "Pure Inter · reliable, timeless",
+    display: "'Inter', ui-sans-serif, system-ui, sans-serif",
+    body: "'Inter', ui-sans-serif, system-ui, sans-serif",
+  },
+  {
     id: "broadsheet",
     name: "Broadsheet",
     description: "All-serif · bookish",
