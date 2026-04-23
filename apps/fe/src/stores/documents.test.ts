@@ -73,7 +73,7 @@ describe("DocumentsStore", () => {
     expect(s.getState().docs[id].emoji).toBe("🌊");
   });
 
-  test.skip("seeds four docs by default and selects the last one", () => {
+  test("seeds four docs by default and selects the last one", () => {
     const s = createDocumentsStore();
     expect(s.getState().order.length).toBe(4);
     expect(s.getState().selectedId).toBe(s.getState().order[s.getState().order.length - 1]);
