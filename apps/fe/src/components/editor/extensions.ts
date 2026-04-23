@@ -15,7 +15,6 @@ export function buildExtensions(): Extensions {
       heading: { levels: [1, 2, 3] },
     }),
     Placeholder.configure({
-      showOnlyCurrent: false,
       placeholder: ({ node, pos }) => {
         if (node.type.name === "heading" && node.attrs.level === 1 && pos === 0) {
           return "Untitled — but full of potential";
