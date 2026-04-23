@@ -1,0 +1,15 @@
+{
+  "name": "be",
+  "type": "module",
+  "scripts": {
+    "dev": "vp exec wrangler dev",
+    "deploy": "vp exec wrangler deploy --minify",
+    "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.12.14"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  }
+}
