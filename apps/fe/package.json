@@ -46,6 +46,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
     "nanoid": "catalog:",
+    "radix-ui": "catalog:",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.0.2",

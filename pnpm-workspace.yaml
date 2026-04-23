@@ -25,6 +25,7 @@ catalog:
   "@tiptap/suggestion": ^3.22.4
   "@types/node": ^24
   nanoid: ^5.1.9
+  radix-ui: ^1.4.3
   tippy.js: ^6.3.7
   typescript: ^5
   vite: npm:@voidzero-dev/vite-plus-core@latest
