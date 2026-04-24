@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { describe, expect, test } from "vite-plus/test";
 import { server } from "#/test/server";
-import { ApiError } from "#/lib/api-error";
 import { useCreateSection, useDeleteSection, useUpdateSection } from "./sections";
 
 function wrap() {
@@ -50,7 +49,7 @@ describe("useUpdateSection", () => {
       wrapper: Wrapper,
     });
     await act(async () => {
-      await result.current.mutateAsync({ contentJson: { type: "doc" }, expectedVersion: 1 });
+      await result.current.mutateAsync({ contentJson: { type: "doc" } });
     });
     const cached = qc.getQueryData<{ sections: Array<{ version: number }> }>([
       "documents",
@@ -60,33 +59,22 @@ describe("useUpdateSection", () => {
     expect(cached?.sections[0]?.version).toBe(2);
   });
 
-  test("surfaces 409 as ApiError with is409VersionConflict", async () => {
+  test("does not include expectedVersion in the request payload by default", async () => {
+    let captured: unknown = null;
     server.use(
-      http.patch("*/sections/:id", () =>
-        HttpResponse.json(
-          {
-            error: "version_conflict",
-            currentVersion: 5,
-            currentSection: baseSection({ version: 5 }),
-          },
-          { status: 409 },
-        ),
-      ),
+      http.patch("*/sections/:id", async ({ request }) => {
+        captured = await request.json();
+        return HttpResponse.json(baseSection({ version: 2 }));
+      }),
     );
     const { Wrapper } = wrap();
     const { result } = renderHook(() => useUpdateSection({ sectionId: "s1", documentId: "d1" }), {
       wrapper: Wrapper,
     });
-    let caught: unknown = null;
     await act(async () => {
-      try {
-        await result.current.mutateAsync({ contentJson: { type: "doc" }, expectedVersion: 1 });
-      } catch (e) {
-        caught = e;
-      }
+      await result.current.mutateAsync({ contentJson: { type: "doc" } });
     });
-    expect(caught).toBeInstanceOf(ApiError);
-    expect((caught as ApiError).is409VersionConflict()).toBe(true);
+    expect(captured).toEqual({ contentJson: { type: "doc" } });
   });
 });
 

@@ -13,7 +13,7 @@ type UpdateSectionInput = {
   kind?: SectionKind;
   frontmatter?: Record<string, unknown>;
   orderKey?: string;
-  expectedVersion: number;
+  expectedVersion?: number;
 };
 
 export function useUpdateSection(args: { sectionId: string; documentId: string }) {
