@@ -17,7 +17,7 @@ export function SectionToolbar({
 }) {
   return (
     <div
-      className={`pointer-events-none absolute top-1 right-1 flex items-center gap-1 transition-opacity ${
+      className={`pointer-events-none absolute top-1 right-1 z-10 flex items-center gap-1 transition-opacity ${
         alwaysVisible
           ? "opacity-100"
           : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
