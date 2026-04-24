@@ -79,7 +79,7 @@ export function Sidebar({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2">
+      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
         {docs.isLoading ? (
           <div className="px-2 text-xs text-[var(--sea-ink-soft)]">Loading…</div>
         ) : (

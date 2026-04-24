@@ -12,7 +12,8 @@ export function LinkPopover({ editor }: { editor: Editor }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-white/90 hover:bg-white/10"
+          onMouseDown={(e) => e.preventDefault()}
+          className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-medium text-(--sea-ink-soft) transition-colors hover:bg-[rgb(79_184_178/0.14)] hover:text-(--sea-ink)"
         >
           <LinkIcon className="size-3" /> Link
         </button>

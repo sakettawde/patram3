@@ -325,6 +325,33 @@ describe("useSectionSave — save triggers", () => {
     expect(window.localStorage.getItem("patram:section:s1")).toBeNull();
   });
 
+  test("never sticks at 'saving' if the request hangs — watchdog terminates it", async () => {
+    // Handler returns a Promise that never resolves: simulates a network hang
+    // (dropped socket, frozen backend). Without a watchdog, the reducer
+    // would be stuck at status="saving" forever.
+    server.use(http.patch("*/sections/:id", () => new Promise<Response>(() => {})));
+    const Wrapper = wrap();
+    const ed = makeStubEditor(serverDoc);
+    const { rerender, result } = renderHook(
+      ({ editor }) => useSectionSave({ section: baseSection(), documentId: "d1", editor }),
+      { wrapper: Wrapper, initialProps: { editor: null as unknown as TEditor | null } },
+    );
+    rerender({ editor: ed as unknown as TEditor });
+    act(() => {
+      ed.__fire("update");
+    });
+    act(() => {
+      void result.current.flushNow();
+    });
+    expect(result.current.state.status).toBe("saving");
+    // Advance past the watchdog (15s) — the reducer must leave "saving"
+    // even though the underlying request is still in flight.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(result.current.state.status).not.toBe("saving");
+  });
+
   test("retries on network failure with exponential backoff, surfaces error on 3rd attempt", async () => {
     let calls = 0;
     server.use(

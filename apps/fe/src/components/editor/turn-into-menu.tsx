@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/react";
+import { ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,16 +9,21 @@ import {
 
 export function TurnIntoMenu({ editor }: { editor: Editor }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="rounded-md px-2 py-1 text-xs text-white/90 hover:bg-white/10"
+          // Preserve the ProseMirror selection; without this the editor blurs,
+          // the bubble menu unmounts, and Radix has no trigger to anchor against —
+          // the content ends up in the top-left of the viewport.
+          onMouseDown={(e) => e.preventDefault()}
+          className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-medium text-(--sea-ink-soft) transition-colors hover:bg-[rgb(79_184_178/0.14)] hover:text-(--sea-ink)"
         >
-          Turn into ▾
+          Turn into
+          <ChevronDown className="size-3" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-44">
+      <DropdownMenuContent align="start" sideOffset={8} className="w-44">
         <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
           Paragraph
         </DropdownMenuItem>

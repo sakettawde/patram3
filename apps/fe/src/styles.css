@@ -304,6 +304,78 @@ a {
   }
 }
 
+.section-block {
+  position: relative;
+  isolation: isolate;
+  transition: background-color 240ms ease;
+  border-radius: 6px;
+}
+
+.section-block::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: -18px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--lagoon) 85%, transparent) 22%,
+    color-mix(in oklab, var(--lagoon-deep) 80%, transparent) 78%,
+    transparent 100%
+  );
+  opacity: 0;
+  transform: scaleY(0.55);
+  transform-origin: center;
+  transition:
+    opacity 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.section-block::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: -22px;
+  width: 10px;
+  border-radius: 999px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--lagoon) 35%, transparent),
+    transparent 78%
+  );
+  opacity: 0;
+  filter: blur(4px);
+  transform: scaleY(0.4);
+  transform-origin: center;
+  transition:
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.section-block:focus-within::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.section-block:focus-within::after {
+  opacity: 0.9;
+  transform: scaleY(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-block::before,
+  .section-block::after {
+    transition: opacity 160ms ease;
+    transform: none;
+  }
+}
+
 .ProseMirror {
   caret-color: var(--lagoon);
   min-height: 40vh;

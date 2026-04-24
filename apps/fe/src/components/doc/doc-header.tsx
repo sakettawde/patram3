@@ -7,11 +7,9 @@ import { useUpdateDocument } from "#/queries/documents";
 export function DocHeader({
   document,
   sectionCount,
-  wordCount,
 }: {
   document: Document;
   sectionCount: number;
-  wordCount: number;
 }) {
   const update = useUpdateDocument(document.id);
   const titleRef = useRef<HTMLDivElement | null>(null);
@@ -83,7 +81,7 @@ export function DocHeader({
       </div>
       <div className="text-[12px] text-[var(--sea-ink-soft)]">
         Edited {formatRelativeTime(new Date(document.updatedAt).getTime())} · {sectionCount} section
-        {sectionCount === 1 ? "" : "s"} · {wordCount} word{wordCount === 1 ? "" : "s"}
+        {sectionCount === 1 ? "" : "s"}
       </div>
       <span hidden aria-hidden>
         {editingLocal}

@@ -1,4 +1,3 @@
-import CharacterCount from "@tiptap/extension-character-count";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -29,7 +28,6 @@ export function buildExtensions(): Extensions {
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: false }),
     Image,
-    CharacterCount,
     CalloutNode,
     SlashCommandsExtension,
   ];

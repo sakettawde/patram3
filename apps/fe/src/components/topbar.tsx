@@ -2,6 +2,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useDocument, useDeleteDocument, useUpdateDocument } from "#/queries/documents";
 import { useUi } from "#/stores/ui";
 import { SaveStatus } from "./save-status";
+import { FontPicker } from "#/components/font-picker";
 import { computeSaveRollup } from "#/lib/save-rollup";
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ export function Topbar({ documentId }: { documentId: string | null }) {
         ) : null}
       </div>
       <div className="flex items-center gap-2">
+        <FontPicker />
         <SaveStatus rollup={rollup} />
         {documentId && q.data ? (
           <DropdownMenu>

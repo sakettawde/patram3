@@ -3,6 +3,7 @@ import type { Editor as TEditor, JSONContent } from "@tiptap/react";
 import type { Section } from "#/lib/api-types";
 import { Editor } from "#/components/editor/editor";
 import { SectionToolbar } from "./section-toolbar";
+import { ConfirmDialog } from "#/components/ui/confirm-dialog";
 import { useSectionSave } from "#/lib/use-section-save";
 import { useDeleteSection } from "#/queries/sections";
 import { useUi } from "#/stores/ui";
@@ -25,6 +26,7 @@ export function SectionBlock({
   onFocusNext?: () => void;
 }) {
   const [editor, setEditor] = useState<TEditor | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { state, flushNow, initialContent } = useSectionSave({
     section,
     documentId,
@@ -88,9 +90,26 @@ export function SectionBlock({
       <SectionToolbar
         state={state}
         disabledDelete={isOnlySection}
-        onDelete={() => del.mutate()}
+        onDelete={() => {
+          const text = editor?.getText() ?? "";
+          if (text.length > 50) {
+            setConfirmDeleteOpen(true);
+          } else {
+            del.mutate();
+          }
+        }}
         onRetry={() => void flushNow()}
         alwaysVisible={state.status === "saving" || state.status === "error"}
+      />
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete this section?"
+        description="Its contents will be removed from the document and can't be recovered."
+        confirmLabel="Delete section"
+        cancelLabel="Keep"
+        tone="destructive"
+        onConfirm={() => del.mutate()}
       />
       <Editor
         sectionId={section.id}

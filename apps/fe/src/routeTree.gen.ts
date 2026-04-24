@@ -8,143 +8,151 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as UnauthRouteImport } from "./routes/_unauth";
-import { Route as AuthedRouteImport } from "./routes/_authed";
-import { Route as AuthedIndexRouteImport } from "./routes/_authed/index";
-import { Route as UnauthSignUpRouteImport } from "./routes/_unauth/sign-up";
-import { Route as UnauthSignInRouteImport } from "./routes/_unauth/sign-in";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnauthRouteImport } from './routes/_unauth'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as UnauthSignUpRouteImport } from './routes/_unauth/sign-up'
+import { Route as UnauthSignInRouteImport } from './routes/_unauth/sign-in'
 
 const UnauthRoute = UnauthRouteImport.update({
-  id: "/_unauth",
+  id: '/_unauth',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthedRoute = AuthedRouteImport.update({
-  id: "/_authed",
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => AuthedRoute,
-} as any);
+} as any)
 const UnauthSignUpRoute = UnauthSignUpRouteImport.update({
-  id: "/sign-up",
-  path: "/sign-up",
+  id: '/sign-up',
+  path: '/sign-up',
   getParentRoute: () => UnauthRoute,
-} as any);
+} as any)
 const UnauthSignInRoute = UnauthSignInRouteImport.update({
-  id: "/sign-in",
-  path: "/sign-in",
+  id: '/sign-in',
+  path: '/sign-in',
   getParentRoute: () => UnauthRoute,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof AuthedIndexRoute;
-  "/sign-in": typeof UnauthSignInRoute;
-  "/sign-up": typeof UnauthSignUpRoute;
+  '/': typeof AuthedIndexRoute
+  '/sign-in': typeof UnauthSignInRoute
+  '/sign-up': typeof UnauthSignUpRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof AuthedIndexRoute;
-  "/sign-in": typeof UnauthSignInRoute;
-  "/sign-up": typeof UnauthSignUpRoute;
+  '/': typeof AuthedIndexRoute
+  '/sign-in': typeof UnauthSignInRoute
+  '/sign-up': typeof UnauthSignUpRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/_authed": typeof AuthedRouteWithChildren;
-  "/_unauth": typeof UnauthRouteWithChildren;
-  "/_unauth/sign-in": typeof UnauthSignInRoute;
-  "/_unauth/sign-up": typeof UnauthSignUpRoute;
-  "/_authed/": typeof AuthedIndexRoute;
+  __root__: typeof rootRouteImport
+  '/_authed': typeof AuthedRouteWithChildren
+  '/_unauth': typeof UnauthRouteWithChildren
+  '/_unauth/sign-in': typeof UnauthSignInRoute
+  '/_unauth/sign-up': typeof UnauthSignUpRoute
+  '/_authed/': typeof AuthedIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/sign-in" | "/sign-up";
-  fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/sign-in" | "/sign-up";
-  id: "__root__" | "/_authed" | "/_unauth" | "/_unauth/sign-in" | "/_unauth/sign-up" | "/_authed/";
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/sign-in' | '/sign-up'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/sign-in' | '/sign-up'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/_unauth'
+    | '/_unauth/sign-in'
+    | '/_unauth/sign-up'
+    | '/_authed/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AuthedRoute: typeof AuthedRouteWithChildren;
-  UnauthRoute: typeof UnauthRouteWithChildren;
+  AuthedRoute: typeof AuthedRouteWithChildren
+  UnauthRoute: typeof UnauthRouteWithChildren
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/_unauth": {
-      id: "/_unauth";
-      path: "";
-      fullPath: "/";
-      preLoaderRoute: typeof UnauthRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_authed": {
-      id: "/_authed";
-      path: "";
-      fullPath: "/";
-      preLoaderRoute: typeof AuthedRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/_authed/": {
-      id: "/_authed/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof AuthedIndexRouteImport;
-      parentRoute: typeof AuthedRoute;
-    };
-    "/_unauth/sign-up": {
-      id: "/_unauth/sign-up";
-      path: "/sign-up";
-      fullPath: "/sign-up";
-      preLoaderRoute: typeof UnauthSignUpRouteImport;
-      parentRoute: typeof UnauthRoute;
-    };
-    "/_unauth/sign-in": {
-      id: "/_unauth/sign-in";
-      path: "/sign-in";
-      fullPath: "/sign-in";
-      preLoaderRoute: typeof UnauthSignInRouteImport;
-      parentRoute: typeof UnauthRoute;
-    };
+    '/_unauth': {
+      id: '/_unauth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof UnauthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/': {
+      id: '/_authed/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_unauth/sign-up': {
+      id: '/_unauth/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof UnauthSignUpRouteImport
+      parentRoute: typeof UnauthRoute
+    }
+    '/_unauth/sign-in': {
+      id: '/_unauth/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof UnauthSignInRouteImport
+      parentRoute: typeof UnauthRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
-  AuthedIndexRoute: typeof AuthedIndexRoute;
+  AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
-};
+}
 
-const AuthedRouteWithChildren = AuthedRoute._addFileChildren(AuthedRouteChildren);
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 interface UnauthRouteChildren {
-  UnauthSignInRoute: typeof UnauthSignInRoute;
-  UnauthSignUpRoute: typeof UnauthSignUpRoute;
+  UnauthSignInRoute: typeof UnauthSignInRoute
+  UnauthSignUpRoute: typeof UnauthSignUpRoute
 }
 
 const UnauthRouteChildren: UnauthRouteChildren = {
   UnauthSignInRoute: UnauthSignInRoute,
   UnauthSignUpRoute: UnauthSignUpRoute,
-};
+}
 
-const UnauthRouteWithChildren = UnauthRoute._addFileChildren(UnauthRouteChildren);
+const UnauthRouteWithChildren =
+  UnauthRoute._addFileChildren(UnauthRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   UnauthRoute: UnauthRouteWithChildren,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }
