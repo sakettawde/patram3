@@ -4,3 +4,4 @@ export * from "./documents";
 export * from "./sections";
 export * from "./section-versions";
 export * from "./section-links";
+export * from "./comments";
