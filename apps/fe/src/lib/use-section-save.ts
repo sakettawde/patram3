@@ -176,5 +176,24 @@ export function useSectionSave({
     void flushNowRef.current();
   }, [editor, seededFromLocal]);
 
+  // Fire-and-forget beacon on tab close / reload so unsaved edits still land.
+  useEffect(() => {
+    const handler = () => {
+      const snap = getLocalSnapshot(section.id);
+      if (!snap) return;
+      const url = `/api/sections/${section.id}`;
+      const blob = new Blob([JSON.stringify({ contentJson: snap.contentJson })], {
+        type: "application/json",
+      });
+      try {
+        navigator.sendBeacon(url, blob);
+      } catch {
+        // best-effort
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [section.id]);
+
   return { state, flushNow, initialContent: content };
 }

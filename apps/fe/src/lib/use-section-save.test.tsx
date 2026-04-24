@@ -302,3 +302,71 @@ describe("useSectionSave — save triggers", () => {
     expect(result.current.state.status).toBe("error");
   });
 });
+
+describe("useSectionSave — beforeunload", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  test("sends a beacon when unloading with a dirty snapshot", () => {
+    const beacons: Array<{ url: string; data: Blob }> = [];
+    const original = navigator.sendBeacon;
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: (url: string, data: Blob) => {
+        beacons.push({ url, data });
+        return true;
+      },
+    });
+
+    putLocalSnapshot("s1", { contentJson: localDoc, savedAt: Date.UTC(2026, 0, 2) });
+    const Wrapper = wrap();
+    renderHook(
+      () =>
+        useSectionSave({
+          section: baseSection({ updatedAt: "2026-01-01T00:00:00Z" }),
+          documentId: "d1",
+          editor: null as unknown as TEditor | null,
+        }),
+      { wrapper: Wrapper },
+    );
+    act(() => {
+      window.dispatchEvent(new Event("beforeunload"));
+    });
+    expect(beacons).toHaveLength(1);
+    expect(beacons[0]!.url).toContain("/sections/s1");
+    expect(beacons[0]!.data.type).toBe("application/json");
+
+    Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: original });
+  });
+
+  test("no-ops when there is no local snapshot", () => {
+    let called = 0;
+    const original = navigator.sendBeacon;
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: () => {
+        called += 1;
+        return true;
+      },
+    });
+    const Wrapper = wrap();
+    renderHook(
+      () =>
+        useSectionSave({
+          section: baseSection(),
+          documentId: "d1",
+          editor: null as unknown as TEditor | null,
+        }),
+      { wrapper: Wrapper },
+    );
+    act(() => {
+      window.dispatchEvent(new Event("beforeunload"));
+    });
+    expect(called).toBe(0);
+    Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: original });
+  });
+});
