@@ -22,7 +22,7 @@ export function UserChip() {
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-[var(--sea-ink)]">
-            {(me.data.user as { name?: string }).name ?? me.data.user.id}
+            {me.data.user.name || me.data.user.email}
           </div>
           <div className="truncate text-[10.5px] text-[var(--sea-ink-soft)]">
             {me.data.workspace.name}

@@ -4,7 +4,7 @@ import { ApiError, unwrap } from "#/lib/api-error";
 import { qk } from "#/lib/query-keys";
 
 export type MeResponse = {
-  user: { id: string };
+  user: { id: string; email: string; name: string };
   workspace: { id: string; name: string; slug: string; createdAt: string; updatedAt: string };
   role: "owner" | "editor" | "viewer";
 };
