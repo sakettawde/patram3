@@ -2,12 +2,23 @@ import { useEffect } from "react";
 import { DocSurface } from "#/components/doc/doc-surface";
 import { Sidebar } from "#/components/sidebar/sidebar";
 import { Topbar } from "#/components/topbar";
+import { useDocumentsList } from "#/queries/documents";
 import { useUi } from "#/stores/ui";
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
   const toggle = useUi((s) => s.toggleSidebar);
   const selectedId = useUi((s) => s.selectedDocumentId);
+  const statusFilter = useUi((s) => s.statusFilter);
+  const list = useDocumentsList({ status: statusFilter });
+  const selectDoc = useUi((s) => s.selectDocument);
+
+  useEffect(() => {
+    if (!selectedId && list.data && list.data.length > 0) {
+      const first = list.data[0];
+      if (first) selectDoc(first.id);
+    }
+  }, [selectedId, list.data, selectDoc]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
