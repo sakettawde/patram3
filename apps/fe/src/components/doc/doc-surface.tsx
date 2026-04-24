@@ -1,14 +1,10 @@
-import { Editor } from "#/components/editor/editor";
-import { useDocuments } from "#/stores/documents";
+import { useDocument } from "#/queries/documents";
 
-export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolean) => void }) {
-  const doc = useDocuments((s) => (s.selectedId ? s.docs[s.selectedId] : null));
-  const updateDoc = useDocuments((s) => s.updateDoc);
-  const renameDoc = useDocuments((s) => s.renameDoc);
-
-  if (!doc) {
+export function DocSurface({ documentId }: { documentId: string | null }) {
+  const q = useDocument(documentId);
+  if (!documentId) {
     return (
-      <div className="mx-auto max-w-[680px] px-6 pt-24 text-center text-[var(--sea-ink-soft)]">
+      <div className="mx-auto max-w-170 px-6 pt-24 text-center text-(--sea-ink-soft)">
         <p className="font-['Fraunces',Georgia,serif] text-2xl text-[var(--sea-ink)]">
           Nothing selected yet
         </p>
@@ -18,18 +14,11 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
       </div>
     );
   }
-
-  return (
-    <div className="mx-auto w-full max-w-[680px] px-6 pt-14 pb-20">
-      <Editor
-        docId={doc.id}
-        initialContent={doc.contentJson}
-        onUpdate={({ json, wordCount, title }) => {
-          updateDoc(doc.id, { contentJson: json, wordCount });
-          renameDoc(doc.id, title);
-        }}
-        onSavingChange={onSavingChange}
-      />
-    </div>
-  );
+  if (q.isLoading)
+    return (
+      <div className="mx-auto max-w-170 px-6 pt-14 text-sm text-(--sea-ink-soft)">Loading…</div>
+    );
+  if (q.isError || !q.data)
+    return <div className="mx-auto max-w-170 px-6 pt-14 text-sm text-red-600">Failed to load.</div>;
+  return <div className="mx-auto max-w-170 px-6 pt-14 pb-20">TODO: render doc</div>;
 }
