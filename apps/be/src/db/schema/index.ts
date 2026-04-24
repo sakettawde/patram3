@@ -5,3 +5,5 @@ export * from "./sections";
 export * from "./section-versions";
 export * from "./section-links";
 export * from "./comments";
+export * from "./ai-suggestions";
+export * from "./relationships";
