@@ -41,13 +41,14 @@ export const sections = pgTable(
     orderKey: text("order_key").notNull(),
     label: text("label"),
     kind: sectionKind("kind").notNull().default("prose"),
-    contentJson: jsonb("content_json").notNull(),
+    contentJson: jsonb("content_json").$type<Record<string, unknown>>().notNull(),
     contentText: text("content_text").notNull().default(""),
     contentTsv: tsvector("content_tsv").generatedAlwaysAs(
       sql`to_tsvector('english', content_text)`,
     ),
     contentHash: text("content_hash").notNull(),
     frontmatter: jsonb("frontmatter")
+      .$type<Record<string, unknown>>()
       .notNull()
       .default(sql`'{}'::jsonb`),
     version: integer("version").notNull().default(1),

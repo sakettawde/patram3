@@ -26,6 +26,7 @@ export const documents = pgTable(
       onDelete: "set null",
     }),
     frontmatter: jsonb("frontmatter")
+      .$type<Record<string, unknown>>()
       .notNull()
       .default(sql`'{}'::jsonb`),
     createdBy: text("created_by").notNull(),

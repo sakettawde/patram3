@@ -141,6 +141,48 @@ describe("section-write service", () => {
     expect(linksAfterUpdate).toHaveLength(0);
   });
 
+  it("partial update without contentJson preserves existing section_links", async () => {
+    const [otherDoc] = await db
+      .insert(documents)
+      .values({ workspaceId: wsId, createdBy: USER, updatedBy: USER, title: "Other" })
+      .returning();
+
+    const created = await createSection(db, {
+      documentId: docId,
+      userId: USER,
+      orderKey: keyAfter(null),
+      contentJson: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "ref",
+                marks: [{ type: "docLink", attrs: { docId: otherDoc!.id } }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await updateSection(db, {
+      sectionId: created.id,
+      expectedVersion: 1,
+      userId: USER,
+      patch: { label: "renamed" },
+    });
+
+    const links = await db
+      .select()
+      .from(sectionLinks)
+      .where(eq(sectionLinks.sourceSectionId, created.id));
+    expect(links).toHaveLength(1);
+    expect(links[0]?.targetDocumentId).toBe(otherDoc!.id);
+  });
+
   it("drops cross-workspace link targets silently", async () => {
     const [ws2] = await db
       .insert(workspaces)

@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 import type { Db } from "../db/client";
 import { documents, sections, sectionLinks } from "../db/schema";
+import { sectionKind } from "../db/schema/enums";
 import { canonicalizeJson } from "../lib/content/canonicalize";
 import { extractLinks, type LinkTuple } from "../lib/content/extract-links";
 import { extractText } from "../lib/content/extract-text";
@@ -20,7 +21,7 @@ export class VersionConflictError extends Error {
   }
 }
 
-export type SectionKind = "prose" | "list" | "table" | "code" | "callout" | "embed";
+export type SectionKind = (typeof sectionKind.enumValues)[number];
 
 export type CreateSectionInput = {
   documentId: string;
@@ -46,13 +47,17 @@ export type UpdateSectionInput = {
 };
 
 type Derived = {
-  canonicalJson: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  canonicalJson: any;
   contentText: string;
   contentHash: string;
   links: LinkTuple[];
 };
 
 async function derive(contentJson: unknown): Promise<Derived> {
+  if (contentJson === null || typeof contentJson !== "object") {
+    throw new Error("contentJson must be a non-null object");
+  }
   const canonical = canonicalizeJson(contentJson);
   const contentText = extractText(contentJson);
   const contentHash = await sha256Hex(canonical);
@@ -92,10 +97,10 @@ export async function createSection(db: Db, input: CreateSectionInput) {
         orderKey: input.orderKey,
         label: input.label ?? null,
         kind: input.kind ?? "prose",
-        contentJson: derived.canonicalJson as never,
+        contentJson: derived.canonicalJson,
         contentText: derived.contentText,
         contentHash: derived.contentHash,
-        frontmatter: (input.frontmatter ?? {}) as never,
+        frontmatter: input.frontmatter ?? {},
         version: 1,
         createdBy: input.userId,
         updatedBy: input.userId,
@@ -157,7 +162,13 @@ export async function updateSection(db: Db, input: UpdateSectionInput) {
       .set(setPatch)
       .where(and(eq(sections.id, input.sectionId), eq(sections.version, input.expectedVersion)))
       .returning();
-    if (!updated) throw new VersionConflictError(current.version);
+    if (!updated) {
+      const [latest] = await tx
+        .select({ version: sections.version })
+        .from(sections)
+        .where(eq(sections.id, input.sectionId));
+      throw new VersionConflictError(latest?.version ?? current.version);
+    }
 
     if (derived) {
       await tx.delete(sectionLinks).where(eq(sectionLinks.sourceSectionId, input.sectionId));
