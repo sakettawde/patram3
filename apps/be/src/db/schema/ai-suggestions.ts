@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { suggestionStatus, suggestionType } from "./enums";
 import { sections } from "./sections";
@@ -6,9 +5,7 @@ import { sections } from "./sections";
 export const aiSuggestions = pgTable(
   "ai_suggestions",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     sectionId: uuid("section_id")
       .notNull()
       .references(() => sections.id, { onDelete: "cascade" }),

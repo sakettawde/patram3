@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { index, pgTable, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { documents } from "./documents";
 import { sections } from "./sections";
@@ -6,9 +5,7 @@ import { sections } from "./sections";
 export const sectionLinks = pgTable(
   "section_links",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     sourceSectionId: uuid("source_section_id")
       .notNull()
       .references(() => sections.id, { onDelete: "cascade" }),

@@ -34,9 +34,7 @@ const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
 export const sections = pgTable(
   "sections",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),

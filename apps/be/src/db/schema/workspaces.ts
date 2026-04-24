@@ -1,11 +1,8 @@
-import { sql } from "drizzle-orm";
 import { index, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { workspaceRole } from "./enums";
 
 export const workspaces = pgTable("workspaces", {
-  id: uuid("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
+  id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

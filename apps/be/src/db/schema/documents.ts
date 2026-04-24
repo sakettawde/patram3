@@ -14,9 +14,7 @@ import { workspaces } from "./workspaces";
 export const documents = pgTable(
   "documents",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),

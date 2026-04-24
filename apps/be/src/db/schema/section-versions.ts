@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -15,9 +14,7 @@ import { sections } from "./sections";
 export const sectionVersions = pgTable(
   "section_versions",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     sectionId: uuid("section_id")
       .notNull()
       .references(() => sections.id, { onDelete: "cascade" }),

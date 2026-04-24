@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { commentThreadStatus } from "./enums";
 import { sections } from "./sections";
@@ -6,9 +5,7 @@ import { sections } from "./sections";
 export const commentThreads = pgTable(
   "comment_threads",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     sectionId: uuid("section_id")
       .notNull()
       .references(() => sections.id, { onDelete: "cascade" }),
@@ -24,9 +21,7 @@ export const commentThreads = pgTable(
 export const comments = pgTable(
   "comments",
   {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
+    id: uuid("id").primaryKey().defaultRandom(),
     threadId: uuid("thread_id")
       .notNull()
       .references(() => commentThreads.id, { onDelete: "cascade" }),
