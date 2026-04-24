@@ -57,6 +57,12 @@ export function useSectionSave({
   const saveInFlightRef = useRef(false);
   const pendingResaveRef = useRef(false);
   const attemptsRef = useRef(0);
+  // Tracks whether the section has unsaved edits. Kept separate from the
+  // reducer state because the reducer briefly transitions saving → saved
+  // → idle, but dirtyRef should only flip back to false once a save lands.
+  // Seeded `true` when we recovered content from localStorage so the
+  // recovery flush actually fires.
+  const dirtyRef = useRef(seededFromLocal);
   const debounceTimerRef = useRef<number | null>(null);
   const retryTimerRef = useRef<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
@@ -90,6 +96,9 @@ export function useSectionSave({
   const flushNow = useCallback(async (): Promise<void> => {
     const ed = editorRef.current;
     if (!ed) return;
+    // Nothing to save — don't fire a PATCH just because the editor blurred
+    // or the component is unmounting with clean content.
+    if (!dirtyRef.current) return;
     if (debounceTimerRef.current) {
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -105,6 +114,7 @@ export function useSectionSave({
       await updateRef.current.mutateAsync({ contentJson: json });
       if (!mountedRef.current) return;
       attemptsRef.current = 0;
+      dirtyRef.current = false;
       clearLocalSnapshot(section.id);
       dispatch({ type: "saveOk", at: Date.now() });
       if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
@@ -151,6 +161,7 @@ export function useSectionSave({
     const onUpdate = () => {
       const json = editor.getJSON();
       putLocalSnapshot(section.id, { contentJson: json, savedAt: Date.now() });
+      dirtyRef.current = true;
       dispatch({ type: "edit" });
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = window.setTimeout(() => {

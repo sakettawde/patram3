@@ -195,6 +195,59 @@ describe("useSectionSave — save triggers", () => {
     expect(calls).toBe(1);
   });
 
+  test("blur without any edits is a no-op (no PATCH fired)", async () => {
+    let calls = 0;
+    server.use(
+      http.patch("*/sections/:id", () => {
+        calls += 1;
+        return HttpResponse.json(baseSection({ version: 2 }));
+      }),
+    );
+    const Wrapper = wrap();
+    const ed = makeStubEditor(serverDoc);
+    const { rerender } = renderHook(
+      ({ editor }) => useSectionSave({ section: baseSection(), documentId: "d1", editor }),
+      { wrapper: Wrapper, initialProps: { editor: null as unknown as TEditor | null } },
+    );
+    rerender({ editor: ed as unknown as TEditor });
+    await act(async () => {
+      ed.__fire("blur");
+      await vi.runAllTimersAsync();
+    });
+    expect(calls).toBe(0);
+  });
+
+  test("blur after a successful save is a no-op (dirty cleared)", async () => {
+    let calls = 0;
+    server.use(
+      http.patch("*/sections/:id", () => {
+        calls += 1;
+        return HttpResponse.json(baseSection({ version: 2 }));
+      }),
+    );
+    const Wrapper = wrap();
+    const ed = makeStubEditor(serverDoc);
+    const { rerender, result } = renderHook(
+      ({ editor }) => useSectionSave({ section: baseSection(), documentId: "d1", editor }),
+      { wrapper: Wrapper, initialProps: { editor: null as unknown as TEditor | null } },
+    );
+    rerender({ editor: ed as unknown as TEditor });
+    act(() => {
+      ed.__fire("update");
+    });
+    await act(async () => {
+      await result.current.flushNow();
+      await vi.runAllTimersAsync();
+    });
+    expect(calls).toBe(1);
+    // Blur after the save — should NOT fire another PATCH.
+    await act(async () => {
+      ed.__fire("blur");
+      await vi.runAllTimersAsync();
+    });
+    expect(calls).toBe(1);
+  });
+
   test("blur triggers an immediate flush", async () => {
     let calls = 0;
     server.use(
@@ -235,6 +288,9 @@ describe("useSectionSave — save triggers", () => {
       { wrapper: Wrapper, initialProps: { editor: null as unknown as TEditor | null } },
     );
     rerender({ editor: ed as unknown as TEditor });
+    act(() => {
+      ed.__fire("update"); // mark the section dirty so flushNow will save
+    });
     await act(async () => {
       const p1 = result.current.flushNow();
       const p2 = result.current.flushNow();
@@ -243,7 +299,8 @@ describe("useSectionSave — save triggers", () => {
       await vi.runAllTimersAsync();
     });
     // First call: one flight; the other two collapse to a single queued resave.
-    expect(calls).toBe(2);
+    // The second save is a no-op (dirty was cleared by first), so only one PATCH.
+    expect(calls).toBe(1);
   });
 
   test("clears localStorage snapshot on successful save", async () => {
@@ -283,6 +340,9 @@ describe("useSectionSave — save triggers", () => {
       { wrapper: Wrapper, initialProps: { editor: null as unknown as TEditor | null } },
     );
     rerender({ editor: ed as unknown as TEditor });
+    act(() => {
+      ed.__fire("update"); // mark dirty so the flush fires
+    });
     await act(async () => {
       await result.current.flushNow();
     });
