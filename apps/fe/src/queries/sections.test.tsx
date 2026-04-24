@@ -79,11 +79,62 @@ describe("useUpdateSection", () => {
 });
 
 describe("useCreateSection", () => {
-  test("appends section to document cache", async () => {
+  test("inserts an optimistic row with the client id and swaps with server result on success", async () => {
     server.use(
-      http.post("*/documents/:docId/sections", () =>
-        HttpResponse.json(baseSection({ id: "s2", orderKey: "a1" }), { status: 201 }),
-      ),
+      http.post("*/documents/:docId/sections", async ({ request }) => {
+        await new Promise((r) => setTimeout(r, 200));
+        const body = (await request.json()) as { id: string; orderKey: string };
+        return HttpResponse.json(
+          baseSection({
+            id: body.id,
+            orderKey: body.orderKey,
+            contentHash: "server-hash",
+            contentText: "",
+            version: 1,
+          }),
+          { status: 201 },
+        );
+      }),
+    );
+    const { qc, Wrapper } = wrap();
+    qc.setQueryData(["me"], {
+      user: { id: "u1", email: "x", name: "x" },
+      workspace: { id: "w1", name: "", slug: "", createdAt: "", updatedAt: "" },
+      role: "owner",
+    });
+    qc.setQueryData(["documents", "detail", "d1"], {
+      document: { id: "d1", updatedAt: "x" },
+      sections: [baseSection()],
+    });
+    const { result } = renderHook(() => useCreateSection("d1"), { wrapper: Wrapper });
+
+    const clientId = "11111111-1111-4111-8111-111111111111";
+    let promise!: Promise<unknown>;
+    act(() => {
+      promise = result.current.mutateAsync({ id: clientId, orderKey: "a1" });
+    });
+    // Optimistic — wait for the onMutate microtask to land.
+    await waitFor(() => {
+      const mid = qc.getQueryData<{
+        sections: Array<{ id: string; contentHash: string }>;
+      }>(["documents", "detail", "d1"]);
+      expect(mid?.sections.map((s) => s.id)).toEqual(["s1", clientId]);
+      expect(mid?.sections[1]?.contentHash).toBe("");
+    });
+
+    await act(async () => {
+      await promise;
+    });
+    const after = qc.getQueryData<{
+      sections: Array<{ id: string; contentHash: string }>;
+    }>(["documents", "detail", "d1"]);
+    expect(after?.sections.map((s) => s.id)).toEqual(["s1", clientId]);
+    expect(after?.sections[1]?.contentHash).toBe("server-hash");
+  });
+
+  test("rolls back the optimistic insert when the server errors", async () => {
+    server.use(
+      http.post("*/documents/:docId/sections", () => HttpResponse.json({}, { status: 500 })),
     );
     const { qc, Wrapper } = wrap();
     qc.setQueryData(["documents", "detail", "d1"], {
@@ -92,14 +143,16 @@ describe("useCreateSection", () => {
     });
     const { result } = renderHook(() => useCreateSection("d1"), { wrapper: Wrapper });
     await act(async () => {
-      await result.current.mutateAsync({});
+      await result.current
+        .mutateAsync({ id: "22222222-2222-4222-8222-222222222222", orderKey: "a1" })
+        .catch(() => {});
     });
-    const cached = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+    const after = qc.getQueryData<{ sections: Array<{ id: string }> }>([
       "documents",
       "detail",
       "d1",
     ]);
-    expect(cached?.sections.map((s) => s.id)).toEqual(["s1", "s2"]);
+    expect(after?.sections.map((s) => s.id)).toEqual(["s1"]);
   });
 });
 

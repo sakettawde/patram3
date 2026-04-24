@@ -28,7 +28,7 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
     if (!cur) return;
     const next = sections[afterIndex + 1];
     const orderKey = keyBetween(cur.orderKey, next?.orderKey ?? null);
-    create.mutate({ orderKey });
+    create.mutate({ id: crypto.randomUUID(), orderKey });
   };
 
   return (

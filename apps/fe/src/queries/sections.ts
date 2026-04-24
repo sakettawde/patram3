@@ -4,6 +4,7 @@ import { ApiError, unwrap } from "#/lib/api-error";
 import { qk } from "#/lib/query-keys";
 import type { Document, Section } from "#/lib/api-types";
 import type { SectionKind } from "#/lib/domain-types";
+import type { MeResponse } from "#/queries/me";
 
 type DocDetail = { document: Document; sections: Section[] };
 
@@ -39,7 +40,8 @@ export function useUpdateSection(args: { sectionId: string; documentId: string }
 }
 
 type CreateSectionInput = {
-  orderKey?: string;
+  id: string;
+  orderKey: string;
   kind?: SectionKind;
   contentJson?: unknown;
   label?: string | null;
@@ -56,10 +58,47 @@ export function useCreateSection(documentId: string) {
           json: input,
         }),
       ),
-    onSuccess: (created) => {
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: qk.document(documentId) });
+      const previous = qc.getQueryData<DocDetail>(qk.document(documentId));
+      const me = qc.getQueryData<MeResponse>(qk.me);
+      const userId = me?.user.id ?? "";
+      const now = new Date().toISOString();
+      const optimistic: Section = {
+        id: input.id,
+        documentId,
+        orderKey: input.orderKey,
+        label: input.label ?? null,
+        kind: input.kind ?? "prose",
+        contentJson: input.contentJson ?? { type: "doc", content: [{ type: "paragraph" }] },
+        contentText: "",
+        contentHash: "",
+        frontmatter: input.frontmatter ?? {},
+        version: 1,
+        createdBy: userId,
+        updatedBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      };
       qc.setQueryData<DocDetail>(qk.document(documentId), (prev) => {
         if (!prev) return prev;
-        const next = [...prev.sections, created].sort((a, b) =>
+        const next = [...prev.sections, optimistic].sort((a, b) =>
+          a.orderKey.localeCompare(b.orderKey),
+        );
+        return { ...prev, sections: next };
+      });
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(qk.document(documentId), ctx.previous);
+      console.error("useCreateSection failed", err);
+    },
+    onSuccess: (real) => {
+      qc.setQueryData<DocDetail>(qk.document(documentId), (prev) => {
+        if (!prev) return prev;
+        const swapped = prev.sections.map((s) => (s.id === real.id ? real : s));
+        const found = swapped.some((s) => s.id === real.id);
+        const next = (found ? swapped : [...swapped, real]).sort((a, b) =>
           a.orderKey.localeCompare(b.orderKey),
         );
         return { ...prev, sections: next };
