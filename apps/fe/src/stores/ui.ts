@@ -2,7 +2,6 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
 import type { DocStatus } from "#/lib/domain-types";
 import type { SectionSave } from "#/lib/section-save-state";
-import { initialSectionSave } from "#/lib/section-save-state";
 
 export type UiState = {
   selectedDocumentId: string | null;
@@ -53,10 +52,4 @@ export const uiStore = createUiStore();
 
 export function useUi<T>(selector: (s: UiStore) => T): T {
   return useStore(uiStore, selector);
-}
-
-// convenience for SectionBlock
-export function ensureSectionSaveState(id: string): SectionSave {
-  const st = uiStore.getState().sectionSaveStates[id];
-  return st ?? initialSectionSave();
 }

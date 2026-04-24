@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_unauth/sign-in")({
       <SignInForm />
       <p className="mt-4 text-xs text-[var(--sea-ink-soft)]">
         Don't have an account?{" "}
-        <Link to={"/sign-up" as string} className="text-[var(--lagoon-deep)] underline">
+        <Link to="/sign-up" className="text-[var(--lagoon-deep)] underline">
           Sign up
         </Link>
       </p>

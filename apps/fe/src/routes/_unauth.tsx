@@ -1,19 +1,24 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { api } from "#/lib/api";
-import { unwrap } from "#/lib/api-error";
+import { ApiError, unwrap } from "#/lib/api-error";
 import { qk } from "#/lib/query-keys";
 
 export const Route = createFileRoute("/_unauth")({
   beforeLoad: async ({ context }) => {
     try {
-      const me = await context.queryClient.ensureQueryData({
+      await context.queryClient.ensureQueryData({
         queryKey: qk.me,
         queryFn: async () => unwrap(await api.me.$get()),
       });
-      if (me) throw redirect({ to: "/" });
+      // /me succeeded → user is authed; redirect to app home
+      throw redirect({ to: "/" });
     } catch (e) {
-      if ((e as { to?: string }).to) throw e;
-      // 401 or network — stay on unauth routes
+      // Re-throw the redirect object
+      if (e && typeof e === "object" && "to" in e) throw e;
+      // Stay on unauth routes only for 401
+      if (e instanceof ApiError && e.status === 401) return;
+      // Anything else (network error, 5xx) — rethrow
+      throw e;
     }
   },
   component: () => <Outlet />,

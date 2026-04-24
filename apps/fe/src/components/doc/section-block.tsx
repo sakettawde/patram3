@@ -134,13 +134,17 @@ export function SectionBlock({
 
   const onCopyEditsThenReload = async () => {
     const ed = editorRef.current;
-    if (ed) {
-      const text = extractSectionText(ed.getJSON());
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        /* non-secure context — swallow */
-      }
+    if (!ed) {
+      await discardAndReload();
+      return;
+    }
+    const text = extractSectionText(ed.getJSON());
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.warn("[patram] Clipboard copy failed; keeping local edits.", err);
+      dispatch({ type: "networkError" });
+      return;
     }
     await discardAndReload();
   };

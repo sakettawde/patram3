@@ -16,6 +16,8 @@ export function DocHeader({
   const update = useUpdateDocument(document.id);
   const titleRef = useRef<HTMLDivElement | null>(null);
   const timer = useRef<number | null>(null);
+  const saveInFlight = useRef(false);
+  const pendingResave = useRef(false);
   const [editingLocal, setEditingLocal] = useState<string | null>(null);
 
   // Reconcile server -> DOM only when not focused.
@@ -25,10 +27,34 @@ export function DocHeader({
     }
   }, [document.title]);
 
+  // Clear the debounce timer on unmount.
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+
   const save = (value: string) => {
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
-      update.mutate({ title: value.trim() || "Untitled" });
+      if (saveInFlight.current) {
+        pendingResave.current = true;
+        return;
+      }
+      saveInFlight.current = true;
+      update
+        .mutateAsync({ title: value.trim() || "Untitled" })
+        .catch((err) => {
+          console.warn("[patram] Title save failed", err);
+        })
+        .finally(() => {
+          saveInFlight.current = false;
+          if (pendingResave.current) {
+            pendingResave.current = false;
+            if (titleRef.current) save(titleRef.current.textContent ?? "");
+          }
+        });
       setEditingLocal(null);
     }, 600);
   };
@@ -49,8 +75,7 @@ export function DocHeader({
           save(v);
         }}
         onBlur={(e) => {
-          if (timer.current) window.clearTimeout(timer.current);
-          update.mutate({ title: (e.target as HTMLDivElement).textContent?.trim() || "Untitled" });
+          save((e.target as HTMLDivElement).textContent ?? "");
           setEditingLocal(null);
         }}
       >
