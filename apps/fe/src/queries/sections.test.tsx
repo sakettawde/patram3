@@ -1,0 +1,139 @@
+import { renderHook, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { http, HttpResponse } from "msw";
+import { describe, expect, test } from "vite-plus/test";
+import { server } from "#/test/server";
+import { ApiError } from "#/lib/api-error";
+import { useCreateSection, useDeleteSection, useUpdateSection } from "./sections";
+
+function wrap() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+  return { qc, Wrapper };
+}
+
+const baseSection = (patch: Partial<Record<string, unknown>> = {}) => ({
+  id: "s1",
+  documentId: "d1",
+  orderKey: "a0",
+  label: null,
+  kind: "prose",
+  contentJson: { type: "doc", content: [{ type: "paragraph" }] },
+  contentText: "",
+  contentHash: "",
+  frontmatter: {},
+  version: 1,
+  createdBy: "u",
+  updatedBy: "u",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  ...patch,
+});
+
+describe("useUpdateSection", () => {
+  test("patches section in place on success", async () => {
+    server.use(
+      http.patch("*/sections/:id", () =>
+        HttpResponse.json(baseSection({ version: 2, updatedAt: "2026-01-02T00:00:00Z" })),
+      ),
+    );
+    const { qc, Wrapper } = wrap();
+    qc.setQueryData(["documents", "detail", "d1"], {
+      document: { id: "d1", updatedAt: "2026-01-01T00:00:00Z" },
+      sections: [baseSection()],
+    });
+    const { result } = renderHook(() => useUpdateSection({ sectionId: "s1", documentId: "d1" }), {
+      wrapper: Wrapper,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ contentJson: { type: "doc" }, expectedVersion: 1 });
+    });
+    const cached = qc.getQueryData<{ sections: Array<{ version: number }> }>([
+      "documents",
+      "detail",
+      "d1",
+    ]);
+    expect(cached?.sections[0]?.version).toBe(2);
+  });
+
+  test("surfaces 409 as ApiError with is409VersionConflict", async () => {
+    server.use(
+      http.patch("*/sections/:id", () =>
+        HttpResponse.json(
+          {
+            error: "version_conflict",
+            currentVersion: 5,
+            currentSection: baseSection({ version: 5 }),
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const { Wrapper } = wrap();
+    const { result } = renderHook(() => useUpdateSection({ sectionId: "s1", documentId: "d1" }), {
+      wrapper: Wrapper,
+    });
+    let caught: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.mutateAsync({ contentJson: { type: "doc" }, expectedVersion: 1 });
+      } catch (e) {
+        caught = e;
+      }
+    });
+    expect(caught).toBeInstanceOf(ApiError);
+    expect((caught as ApiError).is409VersionConflict()).toBe(true);
+  });
+});
+
+describe("useCreateSection", () => {
+  test("appends section to document cache", async () => {
+    server.use(
+      http.post("*/documents/:docId/sections", () =>
+        HttpResponse.json(baseSection({ id: "s2", orderKey: "a1" }), { status: 201 }),
+      ),
+    );
+    const { qc, Wrapper } = wrap();
+    qc.setQueryData(["documents", "detail", "d1"], {
+      document: { id: "d1", updatedAt: "x" },
+      sections: [baseSection()],
+    });
+    const { result } = renderHook(() => useCreateSection("d1"), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({});
+    });
+    const cached = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+      "documents",
+      "detail",
+      "d1",
+    ]);
+    expect(cached?.sections.map((s) => s.id)).toEqual(["s1", "s2"]);
+  });
+});
+
+describe("useDeleteSection", () => {
+  test("removes section from document cache", async () => {
+    server.use(http.delete("*/sections/:id", () => HttpResponse.json({ ok: true })));
+    const { qc, Wrapper } = wrap();
+    qc.setQueryData(["documents", "detail", "d1"], {
+      document: { id: "d1", updatedAt: "x" },
+      sections: [baseSection(), baseSection({ id: "s2" })],
+    });
+    const { result } = renderHook(() => useDeleteSection({ sectionId: "s2", documentId: "d1" }), {
+      wrapper: Wrapper,
+    });
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+    const cached = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+      "documents",
+      "detail",
+      "d1",
+    ]);
+    expect(cached?.sections.map((s) => s.id)).toEqual(["s1"]);
+  });
+});
