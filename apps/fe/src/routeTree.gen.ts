@@ -12,49 +12,53 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as UnauthRouteImport } from "./routes/_unauth";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as AuthedIndexRouteImport } from "./routes/_authed/index";
+import { Route as UnauthSignInRouteImport } from "./routes/_unauth/sign-in";
 
 const UnauthRoute = UnauthRouteImport.update({
   id: "/_unauth",
   getParentRoute: () => rootRouteImport,
 } as any);
-
 const AuthedRoute = AuthedRouteImport.update({
   id: "/_authed",
   getParentRoute: () => rootRouteImport,
 } as any);
-
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
-  id: "/_authed/",
+  id: "/",
   path: "/",
   getParentRoute: () => AuthedRoute,
+} as any);
+const UnauthSignInRoute = UnauthSignInRouteImport.update({
+  id: "/sign-in",
+  path: "/sign-in",
+  getParentRoute: () => UnauthRoute,
 } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof AuthedIndexRoute;
+  "/sign-in": typeof UnauthSignInRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof AuthedIndexRoute;
+  "/sign-in": typeof UnauthSignInRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
-  "/_unauth": typeof UnauthRoute;
-  "/_authed": typeof AuthedRoute;
+  "/_authed": typeof AuthedRouteWithChildren;
+  "/_unauth": typeof UnauthRouteWithChildren;
+  "/_unauth/sign-in": typeof UnauthSignInRoute;
   "/_authed/": typeof AuthedIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/";
+  fullPaths: "/" | "/sign-in";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/";
-  id: "__root__" | "/_unauth" | "/_authed" | "/_authed/";
+  to: "/" | "/sign-in";
+  id: "__root__" | "/_authed" | "/_unauth" | "/_unauth/sign-in" | "/_authed/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  UnauthRoute: typeof UnauthRoute;
-  AuthedRoute: typeof AuthedRoute;
-}
-export interface AuthedRouteChildren {
-  AuthedIndexRoute: typeof AuthedIndexRoute;
+  AuthedRoute: typeof AuthedRouteWithChildren;
+  UnauthRoute: typeof UnauthRouteWithChildren;
 }
 
 declare module "@tanstack/react-router" {
@@ -62,14 +66,14 @@ declare module "@tanstack/react-router" {
     "/_unauth": {
       id: "/_unauth";
       path: "";
-      fullPath: "";
+      fullPath: "/";
       preLoaderRoute: typeof UnauthRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/_authed": {
       id: "/_authed";
       path: "";
-      fullPath: "";
+      fullPath: "/";
       preLoaderRoute: typeof AuthedRouteImport;
       parentRoute: typeof rootRouteImport;
     };
@@ -78,22 +82,42 @@ declare module "@tanstack/react-router" {
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof AuthedIndexRouteImport;
-      parentRoute: typeof AuthedRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
+    "/_unauth/sign-in": {
+      id: "/_unauth/sign-in";
+      path: "/sign-in";
+      fullPath: "/sign-in";
+      preLoaderRoute: typeof UnauthSignInRouteImport;
+      parentRoute: typeof UnauthRoute;
     };
   }
 }
 
-const authedRouteChildren: AuthedRouteChildren = {
+interface AuthedRouteChildren {
+  AuthedIndexRoute: typeof AuthedIndexRoute;
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
 };
 
-const AuthedRouteWithChildren = AuthedRoute._addFileChildren(authedRouteChildren);
+const AuthedRouteWithChildren = AuthedRoute._addFileChildren(AuthedRouteChildren);
 
-const rootRouteChildren: RootRouteChildren = {
-  UnauthRoute: UnauthRoute,
-  AuthedRoute: AuthedRouteWithChildren,
+interface UnauthRouteChildren {
+  UnauthSignInRoute: typeof UnauthSignInRoute;
+}
+
+const UnauthRouteChildren: UnauthRouteChildren = {
+  UnauthSignInRoute: UnauthSignInRoute,
 };
 
+const UnauthRouteWithChildren = UnauthRoute._addFileChildren(UnauthRouteChildren);
+
+const rootRouteChildren: RootRouteChildren = {
+  AuthedRoute: AuthedRouteWithChildren,
+  UnauthRoute: UnauthRouteWithChildren,
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>();
