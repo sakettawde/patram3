@@ -35,7 +35,7 @@ export type CreateSectionInput = {
 
 export type UpdateSectionInput = {
   sectionId: string;
-  expectedVersion: number;
+  expectedVersion?: number;
   userId: string;
   patch: {
     contentJson?: unknown;
@@ -133,7 +133,7 @@ export async function updateSection(db: Db, input: UpdateSectionInput) {
       .from(sections)
       .where(eq(sections.id, input.sectionId));
     if (!current) throw new Error("Section not found");
-    if (current.version !== input.expectedVersion) {
+    if (input.expectedVersion !== undefined && current.version !== input.expectedVersion) {
       throw new VersionConflictError(current.version);
     }
     const [doc] = await tx
@@ -157,11 +157,12 @@ export async function updateSection(db: Db, input: UpdateSectionInput) {
       setPatch.contentHash = derived.contentHash;
     }
 
-    const [updated] = await tx
-      .update(sections)
-      .set(setPatch)
-      .where(and(eq(sections.id, input.sectionId), eq(sections.version, input.expectedVersion)))
-      .returning();
+    const whereClause =
+      input.expectedVersion !== undefined
+        ? and(eq(sections.id, input.sectionId), eq(sections.version, input.expectedVersion))
+        : eq(sections.id, input.sectionId);
+
+    const [updated] = await tx.update(sections).set(setPatch).where(whereClause).returning();
     if (!updated) {
       const [latest] = await tx
         .select({ version: sections.version })

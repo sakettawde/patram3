@@ -126,6 +126,29 @@ describe("sections routes", () => {
     expect(res.status).toBe(404);
   });
 
+  it("PATCH without expectedVersion applies write and bumps version", async () => {
+    const created = await app.request(`/documents/${docId}/sections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const section = (await created.json()) as { id: string; version: number };
+    const res = await app.request(`/sections/${section.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contentJson: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "no-version" }] }],
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const updated = (await res.json()) as { version: number; contentText: string };
+    expect(updated.version).toBe(section.version + 1);
+    expect(updated.contentText).toBe("no-version");
+  });
+
   it("DELETE removes the section", async () => {
     const created = await app.request(`/documents/${docId}/sections`, {
       method: "POST",

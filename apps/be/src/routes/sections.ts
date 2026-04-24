@@ -19,7 +19,7 @@ const createBody = z.object({
 });
 
 const patchBody = z.object({
-  expectedVersion: z.number().int().positive(),
+  expectedVersion: z.number().int().positive().optional(),
   contentJson: z.unknown().optional(),
   label: z.string().nullable().optional(),
   kind: z.enum(["prose", "list", "table", "code", "callout", "embed"]).optional(),
