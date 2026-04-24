@@ -19,7 +19,7 @@ export function SignUpForm() {
         try {
           await signUp.mutateAsync({ name, email, password });
           await router.invalidate();
-          router.navigate({ to: "/" });
+          void router.navigate({ to: "/" });
         } catch (x) {
           if (x instanceof ApiError) {
             if (x.status === 422 || x.status === 400)

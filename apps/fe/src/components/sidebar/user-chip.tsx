@@ -12,7 +12,7 @@ export function UserChip() {
   const seedDev = import.meta.env.DEV
     ? async () => {
         await fetch("/dev/seed", { method: "POST", credentials: "include" });
-        qc.invalidateQueries({ queryKey: qk.documents });
+        void qc.invalidateQueries({ queryKey: qk.documents });
       }
     : null;
 
@@ -32,7 +32,7 @@ export function UserChip() {
           onClick={async () => {
             await signOut.mutateAsync();
             await router.invalidate();
-            router.navigate({ to: "/sign-in" });
+            void router.navigate({ to: "/sign-in" });
           }}
           className="rounded px-2 py-1 text-[11px] text-[var(--sea-ink-soft)] hover:bg-[rgb(79_184_178_/_0.1)]"
           aria-label="Sign out"

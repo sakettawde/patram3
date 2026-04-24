@@ -18,7 +18,7 @@ export function SignInForm() {
         try {
           await signIn.mutateAsync({ email, password });
           await router.invalidate();
-          router.navigate({ to: "/" });
+          void router.navigate({ to: "/" });
         } catch (x) {
           if (x instanceof ApiError && x.status === 401) setErr("Wrong email or password");
           else setErr("Something went wrong. Try again.");

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authed")({
       });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        throw redirect({ to: "/sign-in" as string });
+        throw redirect({ to: "/sign-in" });
       }
       throw e;
     }

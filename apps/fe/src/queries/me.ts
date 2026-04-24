@@ -32,8 +32,8 @@ export function useSignIn() {
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.me });
-      qc.invalidateQueries({ queryKey: qk.documents });
+      void qc.invalidateQueries({ queryKey: qk.me });
+      void qc.invalidateQueries({ queryKey: qk.documents });
     },
   });
 }
@@ -52,8 +52,8 @@ export function useSignUp() {
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.me });
-      qc.invalidateQueries({ queryKey: qk.documents });
+      void qc.invalidateQueries({ queryKey: qk.me });
+      void qc.invalidateQueries({ queryKey: qk.documents });
     },
   });
 }
