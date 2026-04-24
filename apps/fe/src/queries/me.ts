@@ -62,9 +62,13 @@ export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch("/auth/sign-out", { method: "POST", credentials: "include" });
+      const res = await fetch("/auth/sign-out", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
       if (!res.ok) throw new ApiError(res.status, null);
-      // BetterAuth may return 204 with no body.
       try {
         return await res.json();
       } catch {

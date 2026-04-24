@@ -30,14 +30,22 @@ export function UserChip() {
         </div>
         <button
           onClick={async () => {
-            await signOut.mutateAsync();
+            try {
+              await signOut.mutateAsync();
+            } catch (err) {
+              // If the server call fails we still drop local state so the user
+              // isn't stuck signed in the UI.
+              console.warn("[patram] Sign-out request failed, clearing local state.", err);
+              qc.clear();
+            }
             await router.invalidate();
             void router.navigate({ to: "/sign-in" });
           }}
-          className="rounded px-2 py-1 text-[11px] text-[var(--sea-ink-soft)] hover:bg-[rgb(79_184_178_/_0.1)]"
+          disabled={signOut.isPending}
+          className="rounded px-2 py-1 text-[11px] text-[var(--sea-ink-soft)] hover:bg-[rgb(79_184_178_/_0.1)] disabled:opacity-60"
           aria-label="Sign out"
         >
-          Sign out
+          {signOut.isPending ? "Signing out…" : "Sign out"}
         </button>
       </div>
       {seedDev ? (
