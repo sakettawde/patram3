@@ -20,6 +20,10 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
   };
 
   const insertAfter = (afterIndex: number) => {
+    // Guard against rapid double-triggers (e.g. repeated Ctrl+Enter while the
+    // previous request is still in flight). Without this, concurrent calls
+    // compute the same orderKey and collide on the DB unique constraint.
+    if (create.isPending) return;
     const cur = sections[afterIndex];
     if (!cur) return;
     const next = sections[afterIndex + 1];

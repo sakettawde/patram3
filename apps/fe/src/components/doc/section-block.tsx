@@ -52,6 +52,37 @@ export function SectionBlock({
   }, [state, section.id, setSaveState]);
   useEffect(() => () => clearSaveState(section.id), [section.id, clearSaveState]);
 
+  // Register keyboard shortcuts once per editor instance with proper cleanup.
+  // Inlining this inside onReady piled up a new listener on every re-render,
+  // which turned one Ctrl+Enter into N POST /sections requests.
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        onRequestAddBelowRef.current();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        const { selection, doc } = editor.state;
+        if (selection.$head.pos >= doc.content.size - 1) {
+          e.preventDefault();
+          onFocusNextRef.current?.();
+        }
+      }
+      if (e.key === "ArrowUp") {
+        const { selection } = editor.state;
+        if (selection.$head.pos <= 1) {
+          e.preventDefault();
+          onFocusPrevRef.current?.();
+        }
+      }
+    };
+    dom.addEventListener("keydown", handler);
+    return () => dom.removeEventListener("keydown", handler);
+  }, [editor]);
+
   return (
     <section className="section-block group relative py-3">
       <SectionToolbar
@@ -67,26 +98,6 @@ export function SectionBlock({
         onReady={(ed) => {
           setEditor(ed);
           onEditorReady?.(section.id, ed);
-          ed.view.dom.addEventListener("keydown", (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              onRequestAddBelowRef.current();
-            }
-            if (e.key === "ArrowDown") {
-              const { selection, doc } = ed.state;
-              if (selection.$head.pos >= doc.content.size - 1) {
-                e.preventDefault();
-                onFocusNextRef.current?.();
-              }
-            }
-            if (e.key === "ArrowUp") {
-              const { selection } = ed.state;
-              if (selection.$head.pos <= 1) {
-                e.preventDefault();
-                onFocusPrevRef.current?.();
-              }
-            }
-          });
         }}
       />
     </section>
