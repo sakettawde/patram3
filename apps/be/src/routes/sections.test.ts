@@ -159,4 +159,36 @@ describe("sections routes", () => {
     const res = await app.request(`/sections/${section.id}`, { method: "DELETE" });
     expect(res.status).toBe(200);
   });
+
+  it("POST persists a client-supplied id", async () => {
+    const id = crypto.randomUUID();
+    const res = await app.request(`/documents/${docId}/sections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string };
+    expect(body.id).toBe(id);
+  });
+
+  it("POST without id still generates one server-side", async () => {
+    const res = await app.request(`/documents/${docId}/sections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string };
+    expect(body.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  });
+
+  it("POST with a non-uuid id returns 400", async () => {
+    const res = await app.request(`/documents/${docId}/sections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "not-a-uuid" }),
+    });
+    expect(res.status).toBe(400);
+  });
 });

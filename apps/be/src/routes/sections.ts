@@ -11,6 +11,7 @@ import type { AuthEnv } from "../middleware/auth";
 import { requireWrite } from "../middleware/auth";
 
 const createBody = z.object({
+  id: z.string().uuid().optional(),
   orderKey: z.string().optional(),
   kind: z.enum(["prose", "list", "table", "code", "callout", "embed"]).optional(),
   contentJson: z.unknown().optional(),
@@ -51,6 +52,7 @@ export const sectionsRouter = new Hono<AuthEnv>()
     const orderKey = body.orderKey ?? (await computeNextOrderKey(db, docId));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const section = await createSection(db as unknown as PgDatabase<any, any, any> as any, {
+      id: body.id,
       documentId: docId,
       userId,
       orderKey,
