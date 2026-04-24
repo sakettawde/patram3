@@ -104,8 +104,43 @@ describe("useCreateSection", () => {
 });
 
 describe("useDeleteSection", () => {
-  test("removes section from document cache", async () => {
-    server.use(http.delete("*/sections/:id", () => HttpResponse.json({ ok: true })));
+  test("removes the section synchronously (optimistic) and keeps it removed on success", async () => {
+    server.use(
+      http.delete("*/sections/:id", async () => {
+        await new Promise((r) => setTimeout(r, 30));
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    const { qc, Wrapper } = wrap();
+    qc.setQueryData(["documents", "detail", "d1"], {
+      document: { id: "d1", updatedAt: "x" },
+      sections: [baseSection(), baseSection({ id: "s2" })],
+    });
+    const { result } = renderHook(() => useDeleteSection({ sectionId: "s2", documentId: "d1" }), {
+      wrapper: Wrapper,
+    });
+
+    let promise!: Promise<unknown>;
+    act(() => {
+      promise = result.current.mutateAsync();
+    });
+    // Synchronous: already gone from cache.
+    const mid = qc.getQueryData<{ sections: Array<{ id: string }> }>(["documents", "detail", "d1"]);
+    expect(mid?.sections.map((s) => s.id)).toEqual(["s1"]);
+
+    await act(async () => {
+      await promise;
+    });
+    const after = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+      "documents",
+      "detail",
+      "d1",
+    ]);
+    expect(after?.sections.map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  test("restores the section when the server errors", async () => {
+    server.use(http.delete("*/sections/:id", () => HttpResponse.json({}, { status: 500 })));
     const { qc, Wrapper } = wrap();
     qc.setQueryData(["documents", "detail", "d1"], {
       document: { id: "d1", updatedAt: "x" },
@@ -115,13 +150,13 @@ describe("useDeleteSection", () => {
       wrapper: Wrapper,
     });
     await act(async () => {
-      await result.current.mutateAsync();
+      await result.current.mutateAsync().catch(() => {});
     });
-    const cached = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+    const after = qc.getQueryData<{ sections: Array<{ id: string }> }>([
       "documents",
       "detail",
       "d1",
     ]);
-    expect(cached?.sections.map((s) => s.id)).toEqual(["s1"]);
+    expect(after?.sections.map((s) => s.id)).toEqual(["s1", "s2"]);
   });
 });
