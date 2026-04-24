@@ -5,5 +5,8 @@ export default defineConfig({
     environment: "node",
     hookTimeout: 30000,
     testTimeout: 30000,
+    pool: "forks",
+    maxWorkers: 1,
+    fileParallelism: false,
   },
 });
