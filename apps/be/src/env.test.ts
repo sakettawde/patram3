@@ -30,4 +30,24 @@ describe("parseEnv", () => {
     });
     expect(env.DEV_SEED).toBe(false);
   });
+
+  it("throws when BETTER_AUTH_SECRET is shorter than 32 chars", () => {
+    expect(() =>
+      parseEnv({
+        DATABASE_URL: "postgres://u:p@host:5432/db",
+        BETTER_AUTH_SECRET: "short",
+        BETTER_AUTH_URL: "http://localhost:8787",
+      }),
+    ).toThrow();
+  });
+
+  it("throws when BETTER_AUTH_URL is not a valid URL", () => {
+    expect(() =>
+      parseEnv({
+        DATABASE_URL: "postgres://u:p@host:5432/db",
+        BETTER_AUTH_SECRET: "x".repeat(32),
+        BETTER_AUTH_URL: "not-a-url",
+      }),
+    ).toThrow();
+  });
 });
