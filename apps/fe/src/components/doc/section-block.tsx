@@ -1,20 +1,15 @@
-import { useEffect, useReducer, useRef, useState } from "react";
-import type { Editor as TEditor } from "@tiptap/react";
+import { useEffect, useReducer, useRef } from "react";
+import type { Editor as TEditor, JSONContent } from "@tiptap/react";
 import type { Section } from "#/lib/api-types";
 import { Editor } from "#/components/editor/editor";
 import { SectionToolbar } from "./section-toolbar";
-import { SectionConflictBanner } from "./section-conflict-banner";
 import { initialSectionSave, reduceSectionSave } from "#/lib/section-save-state";
-import { ApiError, unwrap } from "#/lib/api-error";
+import { ApiError } from "#/lib/api-error";
 import { useUpdateSection, useDeleteSection } from "#/queries/sections";
 import { useUi } from "#/stores/ui";
-import { extractSectionText } from "#/lib/extract-section-text";
-import { useQueryClient } from "@tanstack/react-query";
-import { qk } from "#/lib/query-keys";
-import type { JSONContent } from "@tiptap/react";
-import { api } from "#/lib/api";
 
 const SAVE_DEBOUNCE_MS = 600;
+const MAX_VERSION_RETRIES = 5;
 
 export function SectionBlock({
   section,
@@ -44,14 +39,11 @@ export function SectionBlock({
   const onRequestAddBelowRef = useRef(onRequestAddBelow);
   const onFocusPrevRef = useRef(onFocusPrev);
   const onFocusNextRef = useRef(onFocusNext);
-  const [conflict, setConflict] = useState(false);
   const setSaveState = useUi((s) => s.setSectionSaveState);
   const clearSaveState = useUi((s) => s.clearSectionSaveState);
   const update = useUpdateSection({ sectionId: section.id, documentId });
   const del = useDeleteSection({ sectionId: section.id, documentId });
-  const qc = useQueryClient();
 
-  // Keep the refs in sync with the latest prop values to avoid stale closures
   useEffect(() => {
     onRequestAddBelowRef.current = onRequestAddBelow;
   }, [onRequestAddBelow]);
@@ -64,7 +56,6 @@ export function SectionBlock({
     onFocusNextRef.current = onFocusNext;
   }, [onFocusNext]);
 
-  // Cleanup on unmount: flip mounted flag and clear all pending timers
   useEffect(
     () => () => {
       mountedRef.current = false;
@@ -82,12 +73,13 @@ export function SectionBlock({
     return () => clearSaveState(section.id);
   }, [section.id, clearSaveState]);
 
+  // Save the editor contents. On 409 (stale expectedVersion) we silently adopt
+  // the server's current version and retry — last-writer-wins. The BE still
+  // bumps the version counter; the UI treats version mismatch as invisible plumbing.
   const triggerSave = () => {
     const ed = editorRef.current;
     if (!ed) return;
 
-    // Serialize saves: if one is already in flight, mark a pending re-save and return.
-    // The .finally() handler will re-arm the debounce once the current save settles.
     if (saveInFlightRef.current) {
       pendingResaveRef.current = true;
       return;
@@ -96,74 +88,42 @@ export function SectionBlock({
     saveInFlightRef.current = true;
     const content = ed.getJSON();
     dispatch({ type: "saveStart" });
-    update
-      .mutateAsync({ contentJson: content, expectedVersion: versionRef.current })
-      .then((updated) => {
-        if (!mountedRef.current) return;
-        versionRef.current = updated.version;
-        dispatch({ type: "saveOk", at: Date.now() });
-        fadeTimer.current = window.setTimeout(() => {
-          if (mountedRef.current) dispatch({ type: "fade" });
-        }, 1500);
-      })
-      .catch((e: unknown) => {
-        if (!mountedRef.current) return;
-        if (e instanceof ApiError && e.is409VersionConflict()) {
-          dispatch({ type: "conflict" });
-          setConflict(true);
-        } else {
+
+    const attempt = (retriesLeft: number): Promise<void> =>
+      update
+        .mutateAsync({ contentJson: content, expectedVersion: versionRef.current })
+        .then((updated) => {
+          if (!mountedRef.current) return;
+          versionRef.current = updated.version;
+          dispatch({ type: "saveOk", at: Date.now() });
+          fadeTimer.current = window.setTimeout(() => {
+            if (mountedRef.current) dispatch({ type: "fade" });
+          }, 1500);
+        })
+        .catch((e: unknown) => {
+          if (!mountedRef.current) return;
+          if (e instanceof ApiError && e.is409VersionConflict() && retriesLeft > 0) {
+            const body = e.body as { currentVersion?: number } | null;
+            if (body?.currentVersion) versionRef.current = body.currentVersion;
+            return attempt(retriesLeft - 1);
+          }
           dispatch({ type: "networkError" });
-        }
-      })
-      .finally(() => {
-        saveInFlightRef.current = false;
-        if (pendingResaveRef.current && mountedRef.current) {
-          pendingResaveRef.current = false;
-          // Re-arm the debounce to coalesce any further keystrokes during this tick
-          if (timer.current) window.clearTimeout(timer.current);
-          timer.current = window.setTimeout(triggerSave, SAVE_DEBOUNCE_MS);
-        }
-      });
+        });
+
+    attempt(MAX_VERSION_RETRIES).finally(() => {
+      saveInFlightRef.current = false;
+      if (pendingResaveRef.current && mountedRef.current) {
+        pendingResaveRef.current = false;
+        if (timer.current) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(triggerSave, SAVE_DEBOUNCE_MS);
+      }
+    });
   };
 
   const onChange = (_ed: TEditor) => {
     dispatch({ type: "edit" });
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(triggerSave, SAVE_DEBOUNCE_MS);
-  };
-
-  const onCopyEditsThenReload = async () => {
-    const ed = editorRef.current;
-    if (!ed) {
-      await discardAndReload();
-      return;
-    }
-    const text = extractSectionText(ed.getJSON());
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (err) {
-      console.warn("[patram] Clipboard copy failed; keeping local edits.", err);
-      dispatch({ type: "networkError" });
-      return;
-    }
-    await discardAndReload();
-  };
-
-  const discardAndReload = async () => {
-    const doc = await qc.fetchQuery({
-      queryKey: qk.document(documentId),
-      queryFn: async () =>
-        unwrap<{ document: unknown; sections: Section[] }>(
-          await api.documents[":id"].$get({ param: { id: documentId } }),
-        ),
-    });
-    const fresh = doc.sections.find((s) => s.id === section.id);
-    if (fresh && editorRef.current) {
-      editorRef.current.commands.setContent(fresh.contentJson as JSONContent);
-      versionRef.current = fresh.version;
-    }
-    setConflict(false);
-    dispatch({ type: "reload" });
   };
 
   return (
@@ -173,26 +133,14 @@ export function SectionBlock({
         disabledDelete={isOnlySection}
         onDelete={() => del.mutate()}
         onRetry={triggerSave}
-        alwaysVisible={
-          state.status === "saving" || state.status === "error" || state.status === "conflict"
-        }
+        alwaysVisible={state.status === "saving" || state.status === "error"}
       />
-      {conflict ? (
-        <SectionConflictBanner
-          onCopyEdits={onCopyEditsThenReload}
-          onDiscardAndReload={discardAndReload}
-        />
-      ) : null}
       <Editor
         sectionId={section.id}
         initialContent={section.contentJson as JSONContent}
         onReady={(ed) => {
           editorRef.current = ed;
           onEditorReady?.(section.id, ed);
-          // Keymap: Ctrl/Cmd+Enter adds a new section below;
-          // ArrowDown at end moves focus to the next section;
-          // ArrowUp at start moves focus to the previous section.
-          // Reading from refs avoids stale closures if prop identities change.
           ed.view.dom.addEventListener("keydown", (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
