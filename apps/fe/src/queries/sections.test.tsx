@@ -1,4 +1,4 @@
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { describe, expect, test } from "vite-plus/test";
@@ -124,9 +124,16 @@ describe("useDeleteSection", () => {
     act(() => {
       promise = result.current.mutateAsync();
     });
-    // Synchronous: already gone from cache.
-    const mid = qc.getQueryData<{ sections: Array<{ id: string }> }>(["documents", "detail", "d1"]);
-    expect(mid?.sections.map((s) => s.id)).toEqual(["s1"]);
+    // Optimistic: onMutate runs on a microtask, so wait for the cache to reflect
+    // the removal — this still resolves well before the 30ms MSW delay completes.
+    await waitFor(() => {
+      const mid = qc.getQueryData<{ sections: Array<{ id: string }> }>([
+        "documents",
+        "detail",
+        "d1",
+      ]);
+      expect(mid?.sections.map((s) => s.id)).toEqual(["s1"]);
+    });
 
     await act(async () => {
       await promise;

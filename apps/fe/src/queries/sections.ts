@@ -74,12 +74,12 @@ export function useDeleteSection(args: { sectionId: string; documentId: string }
     mutationFn: async () =>
       unwrap<{ ok: true }>(await api.sections[":id"].$delete({ param: { id: args.sectionId } })),
     onMutate: async () => {
+      await qc.cancelQueries({ queryKey: qk.document(args.documentId) });
       const previous = qc.getQueryData<DocDetail>(qk.document(args.documentId));
       qc.setQueryData<DocDetail>(qk.document(args.documentId), (prev) => {
         if (!prev) return prev;
         return { ...prev, sections: prev.sections.filter((s) => s.id !== args.sectionId) };
       });
-      await qc.cancelQueries({ queryKey: qk.document(args.documentId) });
       return { previous };
     },
     onError: (err, _vars, ctx) => {
