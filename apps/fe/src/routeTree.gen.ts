@@ -13,6 +13,7 @@ import { Route as UnauthRouteImport } from "./routes/_unauth";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as AuthedIndexRouteImport } from "./routes/_authed/index";
 import { Route as UnauthSignInRouteImport } from "./routes/_unauth/sign-in";
+import { Route as UnauthSignUpRouteImport } from "./routes/_unauth/sign-up";
 
 const UnauthRoute = UnauthRouteImport.update({
   id: "/_unauth",
@@ -32,28 +33,36 @@ const UnauthSignInRoute = UnauthSignInRouteImport.update({
   path: "/sign-in",
   getParentRoute: () => UnauthRoute,
 } as any);
+const UnauthSignUpRoute = UnauthSignUpRouteImport.update({
+  id: "/sign-up",
+  path: "/sign-up",
+  getParentRoute: () => UnauthRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof AuthedIndexRoute;
   "/sign-in": typeof UnauthSignInRoute;
+  "/sign-up": typeof UnauthSignUpRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof AuthedIndexRoute;
   "/sign-in": typeof UnauthSignInRoute;
+  "/sign-up": typeof UnauthSignUpRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/_authed": typeof AuthedRouteWithChildren;
   "/_unauth": typeof UnauthRouteWithChildren;
   "/_unauth/sign-in": typeof UnauthSignInRoute;
+  "/_unauth/sign-up": typeof UnauthSignUpRoute;
   "/_authed/": typeof AuthedIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/sign-in";
+  fullPaths: "/" | "/sign-in" | "/sign-up";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/sign-in";
-  id: "__root__" | "/_authed" | "/_unauth" | "/_unauth/sign-in" | "/_authed/";
+  to: "/" | "/sign-in" | "/sign-up";
+  id: "__root__" | "/_authed" | "/_unauth" | "/_unauth/sign-in" | "/_unauth/sign-up" | "/_authed/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -91,6 +100,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof UnauthSignInRouteImport;
       parentRoute: typeof UnauthRoute;
     };
+    "/_unauth/sign-up": {
+      id: "/_unauth/sign-up";
+      path: "/sign-up";
+      fullPath: "/sign-up";
+      preLoaderRoute: typeof UnauthSignUpRouteImport;
+      parentRoute: typeof UnauthRoute;
+    };
   }
 }
 
@@ -106,10 +122,12 @@ const AuthedRouteWithChildren = AuthedRoute._addFileChildren(AuthedRouteChildren
 
 interface UnauthRouteChildren {
   UnauthSignInRoute: typeof UnauthSignInRoute;
+  UnauthSignUpRoute: typeof UnauthSignUpRoute;
 }
 
 const UnauthRouteChildren: UnauthRouteChildren = {
   UnauthSignInRoute: UnauthSignInRoute,
+  UnauthSignUpRoute: UnauthSignUpRoute,
 };
 
 const UnauthRouteWithChildren = UnauthRoute._addFileChildren(UnauthRouteChildren);
