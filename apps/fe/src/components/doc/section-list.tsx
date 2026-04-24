@@ -16,10 +16,10 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
 
   const insertAfter = (afterIndex: number) => {
     const cur = sections[afterIndex];
-    const next = sections[afterIndex + 1];
     if (!cur) return;
-    const mid = keyBetween(cur.orderKey, next?.orderKey ?? null);
-    create.mutate(mid ? { orderKey: mid } : {});
+    const next = sections[afterIndex + 1];
+    const orderKey = keyBetween(cur.orderKey, next?.orderKey ?? null);
+    create.mutate({ orderKey });
   };
 
   return (
