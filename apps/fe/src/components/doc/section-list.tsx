@@ -12,6 +12,10 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
   const create = useCreateSection(documentId);
   const editors = useRef<EditorsMap>(new Map());
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  // Same-tick rapid inserts would otherwise compute the same orderKey from a
+  // stale `sections` prop (onMutate runs on a microtask). Track pending keys
+  // synchronously and nudge colliders further toward `next`.
+  const pendingKeysRef = useRef(new Set<string>());
 
   const focusSection = (id: string, where: "start" | "end") => {
     const ed = editors.current.get(id);
@@ -23,10 +27,14 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
     const cur = sections[afterIndex];
     if (!cur) return;
     const next = sections[afterIndex + 1];
-    const orderKey = keyBetween(cur.orderKey, next?.orderKey ?? null);
+    let orderKey = keyBetween(cur.orderKey, next?.orderKey ?? null);
+    while (pendingKeysRef.current.has(orderKey)) {
+      orderKey = keyBetween(orderKey, next?.orderKey ?? null);
+    }
+    pendingKeysRef.current.add(orderKey);
     const id = crypto.randomUUID();
     setPendingFocusId(id);
-    create.mutate({ id, orderKey });
+    create.mutate({ id, orderKey }, { onSettled: () => pendingKeysRef.current.delete(orderKey) });
   };
 
   const handleEditorReady = (id: string, ed: TEditor) => {
