@@ -18,7 +18,11 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.all("/auth/*", async (c) => {
   const env = parseEnv(c.env as Record<string, string | undefined>);
   const db = createDb(env.DATABASE_URL);
-  const auth = createAuth(db, { secret: env.BETTER_AUTH_SECRET, baseURL: env.BETTER_AUTH_URL });
+  const auth = createAuth(db, {
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: env.TRUSTED_ORIGINS,
+  });
   return auth.handler(c.req.raw);
 });
 
@@ -27,7 +31,11 @@ app.use("*", async (c, next) => {
   if (c.req.path.startsWith("/auth") || c.req.path === "/health") return next();
   const env = parseEnv(c.env as Record<string, string | undefined>);
   const db = createDb(env.DATABASE_URL);
-  const auth = createAuth(db, { secret: env.BETTER_AUTH_SECRET, baseURL: env.BETTER_AUTH_URL });
+  const auth = createAuth(db, {
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: env.TRUSTED_ORIGINS,
+  });
   return requireSession(auth, db)(
     c as unknown as Parameters<ReturnType<typeof requireSession>>[0],
     next,

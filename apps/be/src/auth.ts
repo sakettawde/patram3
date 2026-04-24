@@ -7,12 +7,16 @@ import { workspaceMembers, workspaces } from "./db/schema";
 
 export type AuthInstance = ReturnType<typeof createAuth>;
 
-export function createAuth(db: Db, opts: { secret: string; baseURL: string }) {
+export function createAuth(
+  db: Db,
+  opts: { secret: string; baseURL: string; trustedOrigins?: string[] },
+) {
   return betterAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: opts.secret,
     baseURL: opts.baseURL,
     basePath: "/auth",
+    trustedOrigins: opts.trustedOrigins ?? [],
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
