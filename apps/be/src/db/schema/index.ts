@@ -7,3 +7,4 @@ export * from "./section-links";
 export * from "./comments";
 export * from "./ai-suggestions";
 export * from "./relationships";
+export * from "../auth-schema";
