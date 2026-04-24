@@ -6,6 +6,7 @@ packages:
 catalog:
   "@floating-ui/dom": ^1.7.6
   "@hono/zod-validator": ^0.7.6
+  "@testing-library/jest-dom": ^6.9.1
   "@testing-library/user-event": ^14.6.1
   "@tiptap/extension-bubble-menu": ^3.22.4
   "@tiptap/extension-character-count": ^3.22.4
@@ -32,6 +33,7 @@ catalog:
   drizzle-kit: ^0.31.10
   drizzle-orm: ^0.45.2
   fractional-indexing: ^3.2.0
+  msw: ^2.13.5
   nanoid: ^5.1.9
   postgres: ^3.4.9
   radix-ui: ^1.4.3
