@@ -12,7 +12,12 @@ type EditorsMap = Map<string, TEditor>;
 export function SectionList({ documentId, sections }: { documentId: string; sections: Section[] }) {
   const create = useCreateSection(documentId);
   const editors = useRef<EditorsMap>(new Map());
-  void editors; // placeholder until Task 28 wires focus routing
+
+  const focusSection = (id: string, where: "start" | "end") => {
+    const ed = editors.current.get(id);
+    if (!ed) return;
+    ed.commands.focus(where);
+  };
 
   const insertAfter = (afterIndex: number) => {
     const cur = sections[afterIndex];
@@ -31,6 +36,15 @@ export function SectionList({ documentId, sections }: { documentId: string; sect
             documentId={documentId}
             isOnlySection={sections.length === 1}
             onRequestAddBelow={() => insertAfter(i)}
+            onEditorReady={(id, ed) => editors.current.set(id, ed)}
+            onFocusPrev={() => {
+              const prev = sections[i - 1];
+              if (prev) focusSection(prev.id, "end");
+            }}
+            onFocusNext={() => {
+              const nextSec = sections[i + 1];
+              if (nextSec) focusSection(nextSec.id, "start");
+            }}
           />
           <AddSectionPill onClick={() => insertAfter(i)} />
         </div>

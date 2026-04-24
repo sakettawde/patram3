@@ -21,11 +21,17 @@ export function SectionBlock({
   documentId,
   isOnlySection,
   onRequestAddBelow,
+  onEditorReady,
+  onFocusPrev,
+  onFocusNext,
 }: {
   section: Section;
   documentId: string;
   isOnlySection: boolean;
   onRequestAddBelow: () => void;
+  onEditorReady?: (id: string, editor: TEditor) => void;
+  onFocusPrev?: () => void;
+  onFocusNext?: () => void;
 }) {
   const [state, dispatch] = useReducer(reduceSectionSave, initialSectionSave());
   const editorRef = useRef<TEditor | null>(null);
@@ -36,6 +42,8 @@ export function SectionBlock({
   const saveInFlightRef = useRef(false);
   const pendingResaveRef = useRef(false);
   const onRequestAddBelowRef = useRef(onRequestAddBelow);
+  const onFocusPrevRef = useRef(onFocusPrev);
+  const onFocusNextRef = useRef(onFocusNext);
   const [conflict, setConflict] = useState(false);
   const setSaveState = useUi((s) => s.setSectionSaveState);
   const clearSaveState = useUi((s) => s.clearSectionSaveState);
@@ -43,10 +51,18 @@ export function SectionBlock({
   const del = useDeleteSection({ sectionId: section.id, documentId });
   const qc = useQueryClient();
 
-  // Keep the ref in sync with the latest prop value to avoid stale closures
+  // Keep the refs in sync with the latest prop values to avoid stale closures
   useEffect(() => {
     onRequestAddBelowRef.current = onRequestAddBelow;
   }, [onRequestAddBelow]);
+
+  useEffect(() => {
+    onFocusPrevRef.current = onFocusPrev;
+  }, [onFocusPrev]);
+
+  useEffect(() => {
+    onFocusNextRef.current = onFocusNext;
+  }, [onFocusNext]);
 
   // Cleanup on unmount: flip mounted flag and clear all pending timers
   useEffect(
@@ -168,12 +184,29 @@ export function SectionBlock({
         initialContent={section.contentJson as JSONContent}
         onReady={(ed) => {
           editorRef.current = ed;
-          // Ctrl/Cmd+Enter keymap: adds a new section below.
-          // Reading from the ref avoids stale closure if the prop identity changes.
+          onEditorReady?.(section.id, ed);
+          // Keymap: Ctrl/Cmd+Enter adds a new section below;
+          // ArrowDown at end moves focus to the next section;
+          // ArrowUp at start moves focus to the previous section.
+          // Reading from refs avoids stale closures if prop identities change.
           ed.view.dom.addEventListener("keydown", (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
               onRequestAddBelowRef.current();
+            }
+            if (e.key === "ArrowDown") {
+              const { selection, doc } = ed.state;
+              if (selection.$head.pos >= doc.content.size - 1) {
+                e.preventDefault();
+                onFocusNextRef.current?.();
+              }
+            }
+            if (e.key === "ArrowUp") {
+              const { selection } = ed.state;
+              if (selection.$head.pos <= 1) {
+                e.preventDefault();
+                onFocusPrevRef.current?.();
+              }
             }
           });
         }}
