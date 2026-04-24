@@ -4,12 +4,26 @@
   "scripts": {
     "dev": "vp exec wrangler dev",
     "deploy": "vp exec wrangler deploy --minify",
-    "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings",
+    "db:generate": "vp exec drizzle-kit generate",
+    "db:migrate": "vp exec drizzle-kit migrate",
+    "db:push": "vp exec drizzle-kit push",
+    "db:studio": "vp exec drizzle-kit studio",
+    "test": "vp test run"
   },
   "dependencies": {
-    "hono": "^4.12.14"
+    "@hono/zod-validator": "catalog:",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
+    "fractional-indexing": "catalog:",
+    "hono": "^4.12.14",
+    "nanoid": "catalog:",
+    "postgres": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "drizzle-kit": "catalog:",
     "wrangler": "^4.4.0"
   }
 }
