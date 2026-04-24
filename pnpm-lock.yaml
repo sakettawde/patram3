@@ -93,6 +93,9 @@ catalogs:
     fractional-indexing:
       specifier: ^3.2.0
       version: 3.2.0
+    hono:
+      specifier: ^4.12.14
+      version: 4.12.14
     msw:
       specifier: ^2.13.5
       version: 2.13.5
@@ -271,6 +274,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.14
       lucide-react:
         specifier: ^0.577.0
         version: 0.577.0(react@19.2.5)
