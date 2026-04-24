@@ -12,6 +12,7 @@ export function createAuth(db: Db, opts: { secret: string; baseURL: string }) {
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: opts.secret,
     baseURL: opts.baseURL,
+    basePath: "/auth",
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
