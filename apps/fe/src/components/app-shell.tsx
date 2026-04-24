@@ -24,8 +24,7 @@ export function AppShell() {
     <div className="grid h-screen w-screen grid-cols-[auto_1fr] overflow-hidden bg-white">
       <Sidebar collapsed={collapsed} onToggleCollapsed={toggle} />
       <main className="flex h-screen flex-col overflow-hidden">
-        {/* TODO(Task 21): replace saveState shim with documentId prop */}
-        <Topbar saveState="idle" />
+        <Topbar documentId={selectedId} />
         <div className="flex-1 overflow-y-auto">
           <DocSurface documentId={selectedId} />
         </div>

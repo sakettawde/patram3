@@ -1,69 +1,81 @@
-import { MoreHorizontal, Star } from "lucide-react";
-import { FontPicker } from "#/components/font-picker";
-import { SaveStatus } from "#/components/save-status";
+import { MoreHorizontal } from "lucide-react";
+import { useDocument, useDeleteDocument, useUpdateDocument } from "#/queries/documents";
+import { useUi } from "#/stores/ui";
+import { SaveStatus } from "./save-status";
+import { computeSaveRollup } from "#/lib/save-rollup";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
-import { cn } from "#/lib/utils";
-import { useDocuments } from "#/stores/documents";
+import type { DocStatus } from "#/lib/domain-types";
 
-export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
-  const selectedId = useDocuments((s) => s.selectedId);
-  const doc = useDocuments((s) => (s.selectedId ? s.docs[s.selectedId] : null));
-  const pinDoc = useDocuments((s) => s.pinDoc);
-  const deleteDoc = useDocuments((s) => s.deleteDoc);
+const STATUS_OPTIONS: DocStatus[] = ["draft", "review", "published", "archived"];
 
-  if (!doc || !selectedId) return <header className="h-[44px] border-b border-[var(--line)]" />;
+export function Topbar({ documentId }: { documentId: string | null }) {
+  const q = useDocument(documentId);
+  const selectDoc = useUi((s) => s.selectDocument);
+  const sectionSaveStates = useUi((s) => s.sectionSaveStates);
+  const update = useUpdateDocument(documentId ?? "__none__");
+  const del = useDeleteDocument();
+
+  const rollup = computeSaveRollup({
+    sections: sectionSaveStates,
+    docMetadataPending: update.isPending,
+  });
 
   return (
-    <header className="flex h-[44px] items-center gap-2.5 border-b border-[var(--line)] px-5">
-      <nav
-        aria-label="Breadcrumb"
-        className="flex items-center gap-1.5 text-[12px] text-[var(--sea-ink-soft)]"
-      >
+    <div className="flex h-11 items-center justify-between border-b border-(--line) px-4">
+      <div className="text-xs text-(--sea-ink-soft)">
         <span>All documents</span>
-        <span className="opacity-40">/</span>
-        <span className="font-semibold text-[var(--sea-ink)]">{doc.title}</span>
-      </nav>
-
-      <div className="ml-auto flex items-center gap-2">
-        <FontPicker />
-        <SaveStatus state={saveState} savedAt={doc.updatedAt} />
-        <button
-          type="button"
-          aria-label={doc.pinned ? "Unpin document" : "Pin document"}
-          onClick={() => pinDoc(selectedId, !doc.pinned)}
-          className={cn(
-            "inline-flex size-7 items-center justify-center rounded-lg border border-[var(--line)] bg-white/70 text-[var(--sea-ink-soft)] hover:bg-white",
-            doc.pinned && "text-[var(--lagoon-deep)]",
-          )}
-        >
-          <Star className={cn("size-3.5", doc.pinned && "fill-current")} />
-        </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="More actions"
-              className="inline-flex size-7 items-center justify-center rounded-lg border border-[var(--line)] bg-white/70 text-[var(--sea-ink-soft)] hover:bg-white"
-            >
-              <MoreHorizontal className="size-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem disabled>Duplicate</DropdownMenuItem>
-            <DropdownMenuItem disabled>Change icon</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => deleteDoc(selectedId)}>
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {q.data ? (
+          <>
+            {" / "}
+            <span className="text-(--sea-ink)">{q.data.document.title || "Untitled"}</span>
+          </>
+        ) : null}
       </div>
-    </header>
+      <div className="flex items-center gap-2">
+        <SaveStatus rollup={rollup} />
+        {documentId && q.data ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Document actions"
+              className="rounded p-1 hover:bg-[rgb(79_184_178/0.1)]"
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Status: {q.data.document.status}</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <DropdownMenuItem key={s} onClick={() => update.mutate({ status: s })}>
+                      {s}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (!confirm("Delete this document?")) return;
+                  await del.mutateAsync(documentId);
+                  selectDoc(null);
+                }}
+                className="text-red-600"
+              >
+                Delete document
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
+    </div>
   );
 }
