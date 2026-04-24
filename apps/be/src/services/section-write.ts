@@ -24,6 +24,7 @@ export class VersionConflictError extends Error {
 export type SectionKind = (typeof sectionKind.enumValues)[number];
 
 export type CreateSectionInput = {
+  id?: string;
   documentId: string;
   userId: string;
   orderKey: string;
@@ -93,6 +94,7 @@ export async function createSection(db: Db, input: CreateSectionInput) {
     const [inserted] = await tx
       .insert(sections)
       .values({
+        ...(input.id ? { id: input.id } : {}),
         documentId: input.documentId,
         orderKey: input.orderKey,
         label: input.label ?? null,
