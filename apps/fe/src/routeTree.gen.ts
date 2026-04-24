@@ -9,51 +9,91 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root";
-import { Route as IndexRouteImport } from "./routes/index";
+import { Route as UnauthRouteImport } from "./routes/_unauth";
+import { Route as AuthedRouteImport } from "./routes/_authed";
+import { Route as AuthedIndexRouteImport } from "./routes/_authed/index";
 
-const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+const UnauthRoute = UnauthRouteImport.update({
+  id: "/_unauth",
   getParentRoute: () => rootRouteImport,
 } as any);
 
+const AuthedRoute = AuthedRouteImport.update({
+  id: "/_authed",
+  getParentRoute: () => rootRouteImport,
+} as any);
+
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
+  id: "/_authed/",
+  path: "/",
+  getParentRoute: () => AuthedRoute,
+} as any);
+
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
+  "/": typeof AuthedIndexRoute;
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
+  "/": typeof AuthedIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
+  "/_unauth": typeof UnauthRoute;
+  "/_authed": typeof AuthedRoute;
+  "/_authed/": typeof AuthedIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths: "/";
   fileRoutesByTo: FileRoutesByTo;
   to: "/";
-  id: "__root__" | "/";
+  id: "__root__" | "/_unauth" | "/_authed" | "/_authed/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
+  UnauthRoute: typeof UnauthRoute;
+  AuthedRoute: typeof AuthedRoute;
+}
+export interface AuthedRouteChildren {
+  AuthedIndexRoute: typeof AuthedIndexRoute;
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    "/": {
-      id: "/";
+    "/_unauth": {
+      id: "/_unauth";
+      path: "";
+      fullPath: "";
+      preLoaderRoute: typeof UnauthRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_authed": {
+      id: "/_authed";
+      path: "";
+      fullPath: "";
+      preLoaderRoute: typeof AuthedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_authed/": {
+      id: "/_authed/";
       path: "/";
       fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
+      preLoaderRoute: typeof AuthedIndexRouteImport;
+      parentRoute: typeof AuthedRouteImport;
     };
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+const authedRouteChildren: AuthedRouteChildren = {
+  AuthedIndexRoute: AuthedIndexRoute,
 };
+
+const AuthedRouteWithChildren = AuthedRoute._addFileChildren(authedRouteChildren);
+
+const rootRouteChildren: RootRouteChildren = {
+  UnauthRoute: UnauthRoute,
+  AuthedRoute: AuthedRouteWithChildren,
+};
+
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>();
