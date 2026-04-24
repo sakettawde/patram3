@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "dotenv": "catalog:",
     "drizzle-kit": "catalog:",
     "wrangler": "^4.4.0"
   }
