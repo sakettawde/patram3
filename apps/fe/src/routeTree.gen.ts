@@ -12,8 +12,8 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as UnauthRouteImport } from "./routes/_unauth";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as AuthedIndexRouteImport } from "./routes/_authed/index";
-import { Route as UnauthSignInRouteImport } from "./routes/_unauth/sign-in";
 import { Route as UnauthSignUpRouteImport } from "./routes/_unauth/sign-up";
+import { Route as UnauthSignInRouteImport } from "./routes/_unauth/sign-in";
 
 const UnauthRoute = UnauthRouteImport.update({
   id: "/_unauth",
@@ -28,14 +28,14 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: "/",
   getParentRoute: () => AuthedRoute,
 } as any);
-const UnauthSignInRoute = UnauthSignInRouteImport.update({
-  id: "/sign-in",
-  path: "/sign-in",
-  getParentRoute: () => UnauthRoute,
-} as any);
 const UnauthSignUpRoute = UnauthSignUpRouteImport.update({
   id: "/sign-up",
   path: "/sign-up",
+  getParentRoute: () => UnauthRoute,
+} as any);
+const UnauthSignInRoute = UnauthSignInRouteImport.update({
+  id: "/sign-in",
+  path: "/sign-in",
   getParentRoute: () => UnauthRoute,
 } as any);
 
@@ -93,18 +93,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedIndexRouteImport;
       parentRoute: typeof AuthedRoute;
     };
-    "/_unauth/sign-in": {
-      id: "/_unauth/sign-in";
-      path: "/sign-in";
-      fullPath: "/sign-in";
-      preLoaderRoute: typeof UnauthSignInRouteImport;
-      parentRoute: typeof UnauthRoute;
-    };
     "/_unauth/sign-up": {
       id: "/_unauth/sign-up";
       path: "/sign-up";
       fullPath: "/sign-up";
       preLoaderRoute: typeof UnauthSignUpRouteImport;
+      parentRoute: typeof UnauthRoute;
+    };
+    "/_unauth/sign-in": {
+      id: "/_unauth/sign-in";
+      path: "/sign-in";
+      fullPath: "/sign-in";
+      preLoaderRoute: typeof UnauthSignInRouteImport;
       parentRoute: typeof UnauthRoute;
     };
   }
