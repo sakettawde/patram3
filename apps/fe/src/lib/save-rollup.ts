@@ -14,7 +14,7 @@ export function computeSaveRollup(input: {
   if (input.docMetadataPending || states.some((s) => s.status === "saving")) {
     return { kind: "saving" };
   }
-  if (states.some((s) => s.status === "error" || s.status === "conflict")) {
+  if (states.some((s) => s.status === "error")) {
     return { kind: "unsaved" };
   }
   if (states.some((s) => s.status === "dirty")) {

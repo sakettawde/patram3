@@ -5,8 +5,8 @@ describe("computeSaveRollup", () => {
   test("all idle -> saved with max savedAt", () => {
     const rollup = computeSaveRollup({
       sections: {
-        a: { status: "idle", lastSavedAt: 100 },
-        b: { status: "idle", lastSavedAt: 200 },
+        a: { status: "idle", lastSavedAt: 100, attempts: 0 },
+        b: { status: "idle", lastSavedAt: 200, attempts: 0 },
       },
       docMetadataPending: false,
     });
@@ -17,8 +17,8 @@ describe("computeSaveRollup", () => {
     expect(
       computeSaveRollup({
         sections: {
-          a: { status: "idle", lastSavedAt: 100 },
-          b: { status: "saving", lastSavedAt: null },
+          a: { status: "idle", lastSavedAt: 100, attempts: 0 },
+          b: { status: "saving", lastSavedAt: null, attempts: 0 },
         },
         docMetadataPending: false,
       }),
@@ -28,16 +28,16 @@ describe("computeSaveRollup", () => {
   test("docMetadataPending -> saving", () => {
     expect(
       computeSaveRollup({
-        sections: { a: { status: "idle", lastSavedAt: 100 } },
+        sections: { a: { status: "idle", lastSavedAt: 100, attempts: 0 } },
         docMetadataPending: true,
       }),
     ).toEqual({ kind: "saving" });
   });
 
-  test("any error or conflict -> unsaved", () => {
+  test("any error -> unsaved", () => {
     expect(
       computeSaveRollup({
-        sections: { a: { status: "conflict", lastSavedAt: null } },
+        sections: { a: { status: "error", lastSavedAt: null, attempts: 3 } },
         docMetadataPending: false,
       }).kind,
     ).toBe("unsaved");
@@ -46,7 +46,7 @@ describe("computeSaveRollup", () => {
   test("any dirty (no worse) -> editing", () => {
     expect(
       computeSaveRollup({
-        sections: { a: { status: "dirty", lastSavedAt: null } },
+        sections: { a: { status: "dirty", lastSavedAt: null, attempts: 0 } },
         docMetadataPending: false,
       }).kind,
     ).toBe("editing");
