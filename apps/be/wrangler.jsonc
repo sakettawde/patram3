@@ -3,6 +3,14 @@
   "name": "patram3-be",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-23",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "patram3-db",
+      "database_id": "2cef8722-898f-4f9c-9de7-4f2a9f2413eb",
+      "migrations_dir": "drizzle",
+    },
+  ],
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
@@ -19,13 +27,6 @@
   //   {
   //     "binding": "MY_BUCKET",
   //     "bucket_name": "my-bucket"
-  //   }
-  // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
   //   }
   // ],
   // "ai": {

@@ -1,9 +1,14 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import users from "./routes/users";
 
-const app = new Hono();
+type Env = { Bindings: CloudflareBindings };
 
-app.get("/", (c) => {
-  return c.text("Hello Hono!");
-});
+const app = new Hono<Env>();
+
+app.use("*", cors({ origin: ["http://localhost:3000"], credentials: false }));
+
+app.get("/", (c) => c.text("patram3-be"));
+app.route("/users", users);
 
 export default app;
