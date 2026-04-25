@@ -1,6 +1,9 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "#/lib/utils";
+import { useUi } from "#/stores/ui";
 import { DocsList } from "./docs-list";
+import { SessionsList } from "./sessions-list";
+import { SidebarTabs } from "./sidebar-tabs";
 import { UserChip } from "./user-chip";
 
 export function Sidebar({
@@ -10,6 +13,7 @@ export function Sidebar({
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
+  const tab = useUi((s) => s.sidebarTab);
   return (
     <aside
       className={cn(
@@ -30,7 +34,8 @@ export function Sidebar({
               <PanelLeftClose className="size-3.5" />
             </button>
           </div>
-          <DocsList />
+          <SidebarTabs />
+          {tab === "docs" ? <DocsList /> : <SessionsList />}
           <UserChip name="Saket" />
         </>
       )}

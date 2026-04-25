@@ -1,8 +1,14 @@
-import { render, screen } from "@testing-library/react";
-import { describe, test } from "vite-plus/test";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, test } from "vite-plus/test";
+import { uiStore } from "#/stores/ui";
 import { AppShell } from "./app-shell";
 
 describe("<AppShell />", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    uiStore.setState({ sidebarTab: "docs" });
+  });
+
   test("mounts with brand, search, and new-doc button", () => {
     render(<AppShell />);
 
@@ -15,5 +21,11 @@ describe("<AppShell />", () => {
     render(<AppShell />);
     screen.getByText("Onboarding notes");
     screen.getByText("Product principles");
+  });
+
+  test("switching to Sessions tab shows the New chat button", () => {
+    render(<AppShell />);
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    screen.getByRole("button", { name: /new chat/i });
   });
 });
