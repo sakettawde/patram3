@@ -37,7 +37,7 @@ export function Editor({ docId, initialContent, onUpdate, onSavingChange }: Edit
       editorProps: {
         attributes: {
           class:
-            "prose prose-slate max-w-none focus:outline-none text-[15.5px] leading-[1.7] text-[color:rgb(33_74_80)]",
+            "prose prose-slate max-w-none focus:outline-none text-[16px] leading-[1.7] text-(--ink)",
         },
       },
       onUpdate: ({ editor: ed }) => {

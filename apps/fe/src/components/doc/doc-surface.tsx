@@ -8,19 +8,14 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
 
   if (!doc) {
     return (
-      <div className="mx-auto max-w-[680px] px-6 pt-24 text-center text-[var(--sea-ink-soft)]">
-        <p className="font-['Fraunces',Georgia,serif] text-2xl text-[var(--sea-ink)]">
-          Nothing selected yet
-        </p>
-        <p className="mt-2 text-sm italic opacity-80">
-          Pick a document on the left, or create a new one.
-        </p>
+      <div className="mx-auto max-w-170 px-6 pt-32 text-center text-[14px] text-(--ink-faint)">
+        No document selected
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[680px] px-6 pt-14 pb-20">
+    <div className="mx-auto w-full max-w-170 px-6 pt-20 pb-24">
       <Editor
         docId={doc.id}
         initialContent={doc.contentJson}

@@ -22,7 +22,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="grid h-screen w-screen grid-cols-[auto_1fr] overflow-hidden bg-white">
+    <div className="grid h-screen w-screen grid-cols-[auto_1fr] overflow-hidden bg-(--paper)">
       <Sidebar collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)} />
       <main className="flex h-screen flex-col overflow-hidden">
         <Topbar saveState={saving ? "saving" : "idle"} />

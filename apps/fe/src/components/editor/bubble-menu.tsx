@@ -21,7 +21,7 @@ export function BubbleMenu({ editor }: { editor: Editor }) {
         return from !== to;
       }}
     >
-      <div className="flex items-center gap-0.5 rounded-lg bg-[#0f2e33] p-1 text-xs text-[#eaf7f4] shadow-[0_14px_34px_rgba(15,46,51,0.35)]">
+      <div className="flex items-center gap-0.5 rounded-md bg-(--ink) p-1 text-xs text-white shadow-[0_8px_20px_rgba(17,17,17,0.18)]">
         <Btn
           active={editor.isActive("bold")}
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -84,10 +84,7 @@ function Btn({
       type="button"
       onClick={onClick}
       {...rest}
-      className={cn(
-        "rounded-md px-2 py-1 hover:bg-white/10",
-        active && "bg-[color:rgb(79_184_178_/_0.22)] text-[color:rgb(194_240_236)]",
-      )}
+      className={cn("rounded px-2 py-1 hover:bg-white/10", active && "bg-white/15 text-white")}
     >
       {children}
     </button>

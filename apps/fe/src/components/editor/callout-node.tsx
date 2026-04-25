@@ -16,14 +16,14 @@ function CalloutView({ node, updateAttributes }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper
       data-callout
-      className="my-3 flex gap-2.5 rounded-xl border border-[color:rgb(79_184_178_/_0.3)] bg-[color:rgb(79_184_178_/_0.1)] p-3"
+      className="my-3 flex gap-2.5 rounded-md border border-(--rule) bg-(--paper-soft) p-3"
     >
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             contentEditable={false}
-            className="h-7 rounded-md px-1.5 text-lg leading-none transition select-none hover:bg-white/50"
+            className="h-7 rounded-md px-1.5 text-lg leading-none transition select-none hover:bg-(--selection)"
             aria-label="Change callout icon"
           >
             {emoji}
@@ -38,7 +38,7 @@ function CalloutView({ node, updateAttributes }: ReactNodeViewProps) {
           />
         </PopoverContent>
       </Popover>
-      <NodeViewContent className="flex-1 text-[14px] text-[var(--sea-ink)]" />
+      <NodeViewContent className="flex-1 text-[15px] text-(--ink)" />
     </NodeViewWrapper>
   );
 }

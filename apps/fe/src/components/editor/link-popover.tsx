@@ -36,11 +36,11 @@ export function LinkPopover({ editor }: { editor: Editor }) {
             placeholder="https://…"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="flex-1 rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs outline-none focus:border-[var(--lagoon-deep)]"
+            className="flex-1 rounded-md border border-(--rule) bg-white px-2 py-1 text-xs outline-none focus:border-(--rule-strong)"
           />
           <button
             type="submit"
-            className="rounded-md bg-[var(--lagoon-deep)] px-2 py-1 text-xs font-semibold text-white"
+            className="rounded-md bg-(--ink) px-2 py-1 text-xs font-medium text-(--paper)"
           >
             Set
           </button>
