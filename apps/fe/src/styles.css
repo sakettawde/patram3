@@ -245,6 +245,46 @@ pre code {
   pointer-events: none;
 }
 
+.boot-loader__wordmark {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  display: inline-block;
+  will-change: opacity, transform, letter-spacing;
+  animation:
+    boot-intro 600ms ease-out both,
+    boot-pulse 2s ease-in-out 900ms infinite;
+}
+@keyframes boot-intro {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    letter-spacing: -0.04em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: -0.01em;
+  }
+}
+@keyframes boot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-loader__wordmark {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 .patram-slash {
   animation: slash-pop 120ms ease-out;
   transform-origin: top left;

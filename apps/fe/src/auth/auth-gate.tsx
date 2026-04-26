@@ -9,6 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
+import { BootLoader } from "#/components/boot-loader";
 import { useCreateUser, useCurrentUserQuery, useStoredUserId } from "./use-current-user";
 import type { User } from "./types";
 
@@ -21,9 +22,12 @@ export function useUser(): User {
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  const [hydrated, setHydrated] = useState(false);
   const [userId, setUserId] = useStoredUserId();
   const query = useCurrentUserQuery(userId);
   const qc = useQueryClient();
+
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     if (query.error?.status === 404) {
@@ -32,11 +36,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [query.error, userId, setUserId, qc]);
 
+  if (!hydrated) return <BootLoader />;
   if (!userId) return <NamePrompt onCreated={(u) => setUserId(u.id)} />;
-  if (query.isPending) return <Splash />;
+  if (query.isPending) return <BootLoader />;
   if (query.error?.status === 404) return <NamePrompt onCreated={(u) => setUserId(u.id)} />;
   if (query.error) return <ErrorState message={query.error.message} />;
-  if (!query.data) return <Splash />;
+  if (!query.data) return <BootLoader />;
 
   return <UserContext.Provider value={query.data}>{children}</UserContext.Provider>;
 }
@@ -77,14 +82,6 @@ function NamePrompt({ onCreated }: { onCreated: (user: User) => void }) {
         </Button>
         {create.error ? <p className="text-sm text-destructive">{create.error.message}</p> : null}
       </form>
-    </Centered>
-  );
-}
-
-function Splash() {
-  return (
-    <Centered>
-      <p className="text-sm text-muted-foreground">Loading…</p>
     </Centered>
   );
 }
