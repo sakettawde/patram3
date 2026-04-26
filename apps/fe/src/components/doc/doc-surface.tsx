@@ -7,7 +7,7 @@ import { useDocuments } from "#/stores/documents";
 import { useAssistant } from "#/stores/assistant";
 import { proposalsStore, useProposals, type Proposal } from "#/stores/proposals";
 import { markdownToHtml } from "#/lib/markdown-to-html";
-import { DOMParser as PMDOMParser, type Node as PMNode } from "@tiptap/pm/model";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/react";
 
@@ -108,7 +108,13 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
   const acceptAll = useCallback(() => {
     if (!doc) return;
     const list = [...(proposalsStore.getState().byDoc[doc.id] ?? [])];
-    list.sort((a, b) => orderInDoc(a, b, editorRef.current));
+    // Apply in reverse document order: editing a block at position N shifts
+    // the positions of every block after it. Targeting later blocks first
+    // means the earlier blocks' ids and positions stay stable for our
+    // subsequent applies. (We resolve by id every time too, but reversing
+    // also avoids pathological cases — e.g. a replace whose new content
+    // includes a block whose id collides with a later proposal target.)
+    list.sort((a, b) => orderInDoc(b, a, editorRef.current));
     for (const p of list) applyProposalToEditor(p, editorRef.current);
     proposalsStore.getState().clearProposals(doc.id);
   }, [doc]);
@@ -205,19 +211,41 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
 function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
   if (!editor) return;
   const view = editor.view;
+
   if (p.kind === "delete") {
     const target = findBlockPos(view.state.doc, p.blockId);
     if (!target) return;
-    view.dispatch(view.state.tr.delete(target.pos, target.pos + target.size));
+    // deleteRange goes through Tiptap's command pipeline so list/quote parents
+    // are joined cleanly instead of leaving an empty wrapper.
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: target.pos, to: target.pos + target.size })
+      .run();
     return;
   }
+
   if (p.kind === "replace") {
     const target = findBlockPos(view.state.doc, p.blockId);
     if (!target) return;
-    const slice = parseMarkdownToSlice(p.content ?? "", view);
-    view.dispatch(view.state.tr.replace(target.pos, target.pos + target.size, slice));
+    // insertContentAt with a {from,to} range deletes the range first and then
+    // inserts the parsed HTML as proper block content. Doing this through
+    // Tiptap (instead of view.dispatch(tr.replace(..., parseSlice(...))))
+    // matters because parseSlice can produce open-boundary slices for inline-
+    // only HTML, which leaves the original block in place and appends the
+    // new content elsewhere — exactly the "added at the bottom, original
+    // didn't disappear" symptom.
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(
+        { from: target.pos, to: target.pos + target.size },
+        markdownToHtml(p.content ?? ""),
+      )
+      .run();
     return;
   }
+
   if (p.kind === "insert_after") {
     const insertPos =
       p.afterBlockId === "TOP"
@@ -227,18 +255,12 @@ function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
             return t ? t.pos + t.size : null;
           })();
     if (insertPos === null) return;
-    const slice = parseMarkdownToSlice(p.content ?? "", view);
-    view.dispatch(view.state.tr.replace(insertPos, insertPos, slice));
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(insertPos, markdownToHtml(p.content ?? ""))
+      .run();
   }
-}
-
-function parseMarkdownToSlice(
-  md: string,
-  view: { state: { schema: import("@tiptap/pm/model").Schema } },
-) {
-  const dom = document.createElement("div");
-  dom.innerHTML = markdownToHtml(md);
-  return PMDOMParser.fromSchema(view.state.schema).parseSlice(dom);
 }
 
 function findBlockPos(doc: PMNode, id: string): { pos: number; size: number } | null {
