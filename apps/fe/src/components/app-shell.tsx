@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { AssistantPanel } from "#/components/assistant/assistant-panel";
-import { DocSurface } from "#/components/doc/doc-surface";
 import { Sidebar } from "#/components/sidebar/sidebar";
 import { Topbar } from "#/components/topbar";
 import { cn } from "#/lib/utils";
 import { assistantStore, useAssistant } from "#/stores/assistant";
 
-export function AppShell() {
+export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.innerWidth < 960;
@@ -45,9 +45,7 @@ export function AppShell() {
           >
             <div className="h-full w-full">{assistantOpen && <AssistantPanel />}</div>
           </aside>
-          <div className="min-w-0 flex-1 overflow-y-auto">
-            <DocSurface />
-          </div>
+          <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
         </div>
       </main>
     </div>
