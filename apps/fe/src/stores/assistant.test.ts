@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { createAssistantStore } from "./assistant";
+import { proposalsStore } from "./proposals";
 
 // localStorage shim: the test environment does not expose a global localStorage.
 // Using a simple in-memory map that mimics the localStorage API.
@@ -32,6 +33,7 @@ vi.mock("#/lib/assistant-api", () => {
     uploadFile: vi.fn(),
     streamMessage: vi.fn(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -60,6 +62,7 @@ describe("AssistantStore", () => {
     }));
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementation(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -148,7 +151,7 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("hello");
+    await s.getState().sendMessage("hello", undefined, "uid");
     const session = s.getState().sessions[id]!;
     expect(session.messages).toHaveLength(2);
     expect(session.messages[0]!.role).toBe("user");
@@ -160,7 +163,7 @@ describe("AssistantStore", () => {
 
   test("sendMessage with no active session is a no-op", async () => {
     const s = createAssistantStore();
-    await s.getState().sendMessage("hello");
+    await s.getState().sendMessage("hello", undefined, "uid");
     expect(s.getState().order).toEqual([]);
   });
 
@@ -168,7 +171,7 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("Outline my essay on quiet design");
+    await s.getState().sendMessage("Outline my essay on quiet design", undefined, "uid");
     expect(s.getState().sessions[id]!.title).toBe("Outline my essay on quiet design");
   });
 
@@ -176,8 +179,8 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("First");
-    await s.getState().sendMessage("Second");
+    await s.getState().sendMessage("First", undefined, "uid");
+    await s.getState().sendMessage("Second", undefined, "uid");
     expect(s.getState().sessions[id]!.title).toBe("First");
   });
 
@@ -185,8 +188,8 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("one");
-    await s.getState().sendMessage("two");
+    await s.getState().sendMessage("one", undefined, "uid");
+    await s.getState().sendMessage("two", undefined, "uid");
     const msgs = s.getState().sessions[id]!.messages;
     expect(msgs).toHaveLength(4);
     expect(msgs.map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
@@ -196,7 +199,7 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-a");
     const a = s.getState().selectedSessionId!;
-    const sendPromise = s.getState().sendMessage("from a");
+    const sendPromise = s.getState().sendMessage("from a", undefined, "uid");
     s.getState().selectSessionForDoc("doc-b");
     const b = s.getState().selectedSessionId!;
     expect(s.getState().selectedSessionId).toBe(b);
@@ -208,7 +211,7 @@ describe("AssistantStore", () => {
   test("persists sessions and open state across instances", async () => {
     const a = createAssistantStore();
     a.getState().selectSessionForDoc("doc-test");
-    await a.getState().sendMessage("hi");
+    await a.getState().sendMessage("hi", undefined, "uid");
     const b = createAssistantStore();
     expect(b.getState().order.length).toBe(1);
     expect(b.getState().open).toBe(true);
@@ -221,6 +224,7 @@ describe("AssistantStore", () => {
     // Make the stream hang so pending stays true while we snapshot persisted state.
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -234,14 +238,14 @@ describe("AssistantStore", () => {
     const a = createAssistantStore();
     a.getState().selectSessionForDoc("doc-test");
     const id = a.getState().selectedSessionId!;
-    const p = a.getState().sendMessage("in flight");
+    const p = a.getState().sendMessage("in flight", undefined, "uid");
     // Allow microtasks to flush so pending bit is set.
     await new Promise<void>((r) => setTimeout(r, 0));
     expect(a.getState().pendingSessionIds[id]).toBe(true);
     const b = createAssistantStore();
     expect(b.getState().pendingSessionIds).toEqual({});
     // Clean up the hanging promise.
-    a.getState().cancelStreaming();
+    a.getState().cancelStreaming("uid");
     await p;
   });
 
@@ -303,7 +307,7 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("hi");
+    await s.getState().sendMessage("hi", undefined, "uid");
     expect(s.getState().sessions[id]?.anthropicSessionId).toBe("asid");
     expect(s.getState().sessions[id]?.environmentId).toBe("eid");
   });
@@ -312,15 +316,15 @@ describe("AssistantStore", () => {
     const apiMod = await import("#/lib/assistant-api");
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
-    await s.getState().sendMessage("a");
-    await s.getState().sendMessage("b");
+    await s.getState().sendMessage("a", undefined, "uid");
+    await s.getState().sendMessage("b", undefined, "uid");
     expect((apiMod.createSession as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
   });
 
   test("text_delta accumulates into streaming.text and message_end commits to messages", async () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
-    await s.getState().sendMessage("hi");
+    await s.getState().sendMessage("hi", undefined, "uid");
     const sid = s.getState().selectedSessionId!;
     const msgs = s.getState().sessions[sid]!.messages;
     expect(msgs.at(-1)).toMatchObject({ role: "assistant", content: "ok" });
@@ -330,14 +334,19 @@ describe("AssistantStore", () => {
   test("error event sets streaming.status=error", async () => {
     const apiMod = await import("#/lib/assistant-api");
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      async (_sid: string, _body: unknown, opts: { onEvent: (e: unknown) => void }) => {
+      async (
+        _userId: string,
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void },
+      ) => {
         opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
         opts.onEvent({ type: "error", message: "boom", retryable: true });
       },
     );
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
-    await s.getState().sendMessage("hi");
+    await s.getState().sendMessage("hi", undefined, "uid");
     expect(s.getState().streaming?.status).toBe("error");
   });
 
@@ -345,6 +354,7 @@ describe("AssistantStore", () => {
     const apiMod = await import("#/lib/assistant-api");
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -360,10 +370,10 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    const p = s.getState().sendMessage("hi");
+    const p = s.getState().sendMessage("hi", undefined, "uid");
     // Allow the stream mock to enqueue.
     await new Promise<void>((r) => setTimeout(r, 0));
-    s.getState().cancelStreaming();
+    s.getState().cancelStreaming("uid");
     await p;
     const last = s.getState().sessions[id]!.messages.at(-1)!;
     expect(last.role).toBe("assistant");
@@ -379,7 +389,7 @@ describe("AssistantStore", () => {
     const s = createAssistantStore();
     s.getState().selectSessionForDoc("doc-test");
     const id = s.getState().selectedSessionId!;
-    await s.getState().sendMessage("hi");
+    await s.getState().sendMessage("hi", undefined, "uid");
     expect(s.getState().sessions[id]!.messages).toHaveLength(0);
     expect(s.getState().streaming?.status).toBe("error");
     expect(s.getState().streaming?.errorMessage).toContain("network_down");
@@ -392,6 +402,7 @@ describe("AssistantStore", () => {
     // First stream: hang until aborted.
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -405,6 +416,7 @@ describe("AssistantStore", () => {
     // Second stream: hang and record whether its abort fires.
     (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
@@ -424,19 +436,19 @@ describe("AssistantStore", () => {
     s.getState().selectSessionForDoc("doc-test");
 
     // Start first send and let the mock enqueue events.
-    const p1 = s.getState().sendMessage("first");
+    const p1 = s.getState().sendMessage("first", undefined, "uid");
     await new Promise<void>((r) => setTimeout(r, 0));
 
     // Cancel the first stream; its finally block runs asynchronously.
-    s.getState().cancelStreaming();
+    s.getState().cancelStreaming("uid");
 
     // Immediately start the second send BEFORE the first finally can run.
-    const p2 = s.getState().sendMessage("second");
+    const p2 = s.getState().sendMessage("second", undefined, "uid");
     await new Promise<void>((r) => setTimeout(r, 0));
 
     // Cancel the second stream — must fire even though the first finally
     // ran concurrently and tried to delete from streamControllers.
-    s.getState().cancelStreaming();
+    s.getState().cancelStreaming("uid");
 
     await Promise.all([p1, p2]);
 
@@ -470,5 +482,43 @@ describe("AssistantStore", () => {
     expect(a).not.toBe(b);
     store.getState().selectSessionForDoc("doc1");
     expect(store.getState().selectedSessionId).toBe(a);
+  });
+
+  test("proposal events from streamMessage land in the proposals store", async () => {
+    const apiMod = await import("#/lib/assistant-api");
+
+    (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (
+        _userId: string,
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
+      ) => {
+        opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
+        opts.onEvent({
+          type: "proposal",
+          id: "p1",
+          kind: "replace",
+          blockId: "b1",
+          content: "new content",
+          toolUseId: "tu1",
+        });
+        opts.onEvent({ type: "message_end" });
+      },
+    );
+
+    proposalsStore.getState().clearProposals("doc-proposal-test");
+
+    const store = createAssistantStore();
+    store.getState().selectSessionForDoc("doc-proposal-test");
+
+    await store.getState().sendMessage("make a change", undefined, "uid");
+
+    const proposals = proposalsStore.getState().byDoc["doc-proposal-test"];
+    expect(proposals).toHaveLength(1);
+    expect(proposals![0]!.id).toBe("p1");
+    expect(proposals![0]!.kind).toBe("replace");
+    expect(proposals![0]!.blockId).toBe("b1");
+    expect(proposals![0]!.toolUseId).toBe("tu1");
   });
 });

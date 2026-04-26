@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import * as api from "#/lib/assistant-api";
+import { proposalsStore } from "./proposals";
 
 export type ChatRole = "user" | "assistant";
 
@@ -62,9 +63,13 @@ export type AssistantActions = {
   selectSession: (id: string) => void;
   renameSession: (id: string, title: string) => void;
   deleteSession: (id: string) => void;
-  sendMessage: (content: string, attachments?: AttachmentMeta[]) => Promise<void>;
-  cancelStreaming: () => void;
-  retryLastTurn: () => Promise<void>;
+  sendMessage: (
+    content: string,
+    attachments: AttachmentMeta[] | undefined,
+    userId: string,
+  ) => Promise<void>;
+  cancelStreaming: (userId: string) => void;
+  retryLastTurn: (userId: string) => Promise<void>;
 };
 
 export type AssistantStore = AssistantState & AssistantActions;
@@ -199,7 +204,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           });
         },
 
-        sendMessage: async (content, attachments) => {
+        sendMessage: async (content, attachments, userId) => {
           const trimmed = content.trim();
           if (trimmed === "") return;
           const sid = get().selectedSessionId;
@@ -214,7 +219,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           let environmentId = session.environmentId;
           if (!anthropicSessionId || !environmentId) {
             try {
-              const created = await api.createSession();
+              const created = await api.createSession(userId);
               anthropicSessionId = created.sessionId;
               environmentId = created.environmentId;
               set((st) => {
@@ -297,7 +302,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
               documentId: session.documentId,
             };
 
-            await api.streamMessage(anthropicSessionId!, body, {
+            await api.streamMessage(userId, anthropicSessionId!, body, {
               signal: ac.signal,
               onEvent: (e) => {
                 if (e.type === "message_start") {
@@ -362,6 +367,19 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
                       streaming: null,
                     };
                   });
+                } else if (e.type === "proposal") {
+                  const docId = get().sessions[sid]?.documentId;
+                  if (docId) {
+                    proposalsStore.getState().addProposal(docId, {
+                      id: e.id,
+                      kind: e.kind,
+                      blockId: e.blockId,
+                      afterBlockId: e.afterBlockId,
+                      content: e.content,
+                      toolUseId: e.toolUseId,
+                      createdAt: Date.now(),
+                    });
+                  }
                 } else if (e.type === "error") {
                   set((st) => {
                     if (!st.streaming || st.streaming.sessionId !== sid) return st;
@@ -409,7 +427,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           }
         },
 
-        cancelStreaming: () => {
+        cancelStreaming: (userId) => {
           const sid = get().selectedSessionId;
           if (!sid) return;
           const slot = get().streaming;
@@ -457,12 +475,12 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           const session = get().sessions[sid];
           const asid = session?.anthropicSessionId;
           if (asid) {
-            void api.cancel(asid);
+            void api.cancel(userId, asid);
           }
         },
 
-        retryLastTurn: async () => {
-          await get().sendMessage("Please continue.");
+        retryLastTurn: async (userId) => {
+          await get().sendMessage("Please continue.", undefined, userId);
         },
       }),
       {
