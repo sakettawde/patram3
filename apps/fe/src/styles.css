@@ -519,3 +519,40 @@ pre code {
 .prose-assistant td[align="center"] {
   text-align: center;
 }
+
+/* Proposal decorations — inline diff overlay for agent-proposed edits. */
+.proposal-replace {
+  background: rgba(34, 197, 94, 0.08);
+  border-left: 2px solid rgba(34, 197, 94, 0.6);
+}
+.proposal-delete {
+  background: rgba(239, 68, 68, 0.08);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+.proposal-preview {
+  margin: 0.25rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid rgba(34, 197, 94, 0.6);
+  background: rgba(34, 197, 94, 0.04);
+  border-radius: 0 4px 4px 0;
+}
+.proposal-chips {
+  display: inline-flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.proposal-chips button {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--ink-faint);
+  background: white;
+  cursor: pointer;
+}
+.proposal-accept:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+.proposal-reject:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
