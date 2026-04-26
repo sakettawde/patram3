@@ -1,9 +1,16 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import { nanoid } from "nanoid";
 
 const KEY = new PluginKey("uniqueId");
 
+// BLOCK_TYPES is the static allowlist for addGlobalAttributes (Tiptap requires
+// concrete type names there). Runtime stamping in appendTransaction +
+// stampMissingIds uses `node.type.isBlock`, so adding a new block extension
+// without updating this list still gets ids at runtime — but those ids won't
+// round-trip through data-id parseHTML/renderHTML for that type. Keep this in
+// sync with the buildExtensions() roster in extensions.ts.
 const BLOCK_TYPES = [
   "paragraph",
   "heading",
@@ -45,21 +52,31 @@ function stampJsonContent(node: Record<string, unknown>): Record<string, unknown
 }
 
 /**
+ * Return true as soon as any block node in the doc is missing an `id`.
+ * Bails out on the first match — cheap to call before a full stamp walk.
+ */
+function hasUnstampedBlock(doc: PMNode): boolean {
+  let found = false;
+  doc.descendants((node) => {
+    if (found) return false;
+    if (node.type.isBlock && node.type.name !== "doc" && !node.attrs.id) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+/**
  * Dispatch a transaction that stamps `id` attributes on any block nodes
  * in the current editor state that are missing one.  No-ops if all blocks
  * already have IDs (safe to call on every transaction).
  */
 function stampMissingIds(editor: {
-  state: import("@tiptap/pm/state").EditorState;
-  view: { dispatch: (tr: import("@tiptap/pm/state").Transaction) => void };
+  state: EditorState;
+  view: { dispatch: (tr: Transaction) => void };
 }): void {
-  let needsStamp = false;
-  editor.state.doc.descendants((node) => {
-    if (!node.type.isBlock || node.type.name === "doc") return;
-    if (!node.attrs.id) needsStamp = true;
-  });
-  if (!needsStamp) return;
-
   const tr = editor.state.tr;
   let modified = false;
   editor.state.doc.descendants((node, pos) => {
@@ -108,9 +125,11 @@ export const UniqueID = Extension.create({
   },
 
   onBeforeCreate() {
-    // Pre-stamp the JSON content option so the initial doc already has IDs.
-    // This runs synchronously before createDoc(), ensuring getJSON() returns
-    // IDs even on an unmounted editor.
+    // Tiptap reads `this.editor.options.content` *after* onBeforeCreate fires,
+    // so rewriting it here propagates into the initial doc. This is undocumented
+    // ordering — if a future Tiptap version reads options.content earlier, this
+    // hook silently stops doing anything and tests/CI catch it (Test 1 in
+    // unique-id.test.ts asserts ids on getJSON() of the initial content).
     const content = this.editor.options.content as unknown;
     if (content && typeof content === "object" && !Array.isArray(content)) {
       this.editor.options.content = stampJsonContent(
@@ -123,10 +142,13 @@ export const UniqueID = Extension.create({
     }
   },
 
-  onTransaction({ editor }) {
+  onTransaction({ editor, transaction }) {
     // Fallback for unmounted editors (tests, SSR) where appendTransaction
-    // is not active. In mounted editors appendTransaction handles this and
-    // the guard below exits immediately (all nodes already have IDs).
+    // is not active. In mounted editors appendTransaction already stamped ids
+    // before this fires, so hasUnstampedBlock returns false after one node and
+    // we skip the full restamp entirely — no full-doc walk on every keystroke.
+    if (!transaction.docChanged) return;
+    if (!hasUnstampedBlock(editor.state.doc)) return;
     stampMissingIds(editor);
   },
 
