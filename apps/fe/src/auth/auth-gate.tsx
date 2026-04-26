@@ -10,7 +10,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { BootLoader } from "#/components/boot-loader";
-import { useCreateUser, useCurrentUserQuery, useStoredUserId } from "./use-current-user";
+import {
+  useCreateUser,
+  useCurrentUserQuery,
+  useLookupUser,
+  useStoredUserId,
+} from "./use-current-user";
 import type { User } from "./types";
 
 const UserContext = createContext<User | null>(null);
@@ -47,41 +52,90 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 function NamePrompt({ onCreated }: { onCreated: (user: User) => void }) {
+  const [mode, setMode] = useState<"create" | "code">("create");
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const create = useCreateUser();
+  const lookup = useLookupUser();
+  const qc = useQueryClient();
 
   const trimmed = name.trim();
-  const valid = trimmed.length > 0 && trimmed.length <= 80;
+  const trimmedCode = code.trim();
+  const validName = trimmed.length > 0 && trimmed.length <= 80;
 
-  const onSubmit = async (e: FormEvent) => {
+  const onCreateSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!valid || create.isPending) return;
+    if (!validName || create.isPending) return;
     const user = await create.mutateAsync({ name: trimmed });
     onCreated(user);
   };
 
+  const onCodeSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!trimmedCode || lookup.pending) return;
+    const user = await lookup.lookup(trimmedCode);
+    if (user) {
+      qc.setQueryData(["currentUser", user.id], user);
+      onCreated(user);
+    }
+  };
+
   return (
     <Centered>
-      <form onSubmit={onSubmit} className="flex w-full max-w-sm flex-col gap-4">
-        <div className="space-y-1">
-          <h1 className="text-lg font-medium">What should we call you?</h1>
-          <p className="text-sm text-muted-foreground">
-            Used to label your work. You can change this later.
-          </p>
-        </div>
-        <Input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          maxLength={80}
-          disabled={create.isPending}
-        />
-        <Button type="submit" disabled={!valid || create.isPending}>
-          {create.isPending ? "Creating…" : "Continue"}
-        </Button>
-        {create.error ? <p className="text-sm text-destructive">{create.error.message}</p> : null}
-      </form>
+      {mode === "create" ? (
+        <form onSubmit={onCreateSubmit} className="flex w-full max-w-sm flex-col gap-4">
+          <div className="space-y-1">
+            <h1 className="text-lg font-medium">What should we call you?</h1>
+            <p className="text-sm text-muted-foreground">
+              Used to label your work. You can change this later.
+            </p>
+          </div>
+          <Input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            maxLength={80}
+            disabled={create.isPending}
+          />
+          <Button type="submit" disabled={!validName || create.isPending}>
+            {create.isPending ? "Creating…" : "Continue"}
+          </Button>
+          {create.error ? <p className="text-sm text-destructive">{create.error.message}</p> : null}
+          <button
+            type="button"
+            onClick={() => setMode("code")}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Already have a code? Paste it
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={onCodeSubmit} className="flex w-full max-w-sm flex-col gap-4">
+          <div className="space-y-1">
+            <h1 className="text-lg font-medium">Welcome back</h1>
+            <p className="text-sm text-muted-foreground">Paste your patram code to continue.</p>
+          </div>
+          <Input
+            autoFocus
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="Your patram code"
+            disabled={lookup.pending}
+          />
+          <Button type="submit" disabled={!trimmedCode || lookup.pending}>
+            {lookup.pending ? "Checking…" : "Continue"}
+          </Button>
+          {lookup.error ? <p className="text-sm text-destructive">{lookup.error}</p> : null}
+          <button
+            type="button"
+            onClick={() => setMode("create")}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Don't have a code? Pick a name
+          </button>
+        </form>
+      )}
     </Centered>
   );
 }

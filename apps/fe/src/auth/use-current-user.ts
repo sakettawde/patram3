@@ -47,3 +47,28 @@ export function useCreateUser() {
     },
   });
 }
+
+export function useLookupUser() {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const lookup = async (id: string): Promise<User | null> => {
+    setPending(true);
+    setError(null);
+    try {
+      const user = await api.get<User>(`/users/${id}`);
+      return user;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setError("Code not found");
+        return null;
+      }
+      setError(e instanceof Error ? e.message : "Lookup failed");
+      return null;
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return { lookup, pending, error };
+}
