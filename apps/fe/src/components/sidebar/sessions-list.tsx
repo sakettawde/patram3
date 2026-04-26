@@ -1,3 +1,4 @@
+import { Settings, Zap } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useUser } from "#/auth/auth-gate";
 import { useDocumentsQuery } from "#/queries/documents";
@@ -5,6 +6,7 @@ import { assistantStore, useAssistant } from "#/stores/assistant";
 import { useDocuments } from "#/stores/documents";
 import type { DocumentRow } from "#/lib/documents-api";
 import { SessionRow } from "./session-row";
+import { SidebarNavLink } from "./sidebar-nav-link";
 import { SidebarSection } from "./sidebar-section";
 
 export function SessionsList() {
@@ -45,28 +47,31 @@ export function SessionsList() {
     });
 
   return (
-    <div className="flex-1 overflow-y-auto pb-2">
-      <SidebarSection label="Chats" count={sortedIds.length}>
-        {sortedIds.map((id) => {
-          const s = sessions[id]!;
-          const docRow = docsById.get(s.documentId);
-          if (!docRow) return null;
-          return (
-            <SessionRow
-              key={id}
-              title={docRow.title || "Untitled"}
-              emoji={docRow.emoji}
-              updatedAt={s.updatedAt}
-              active={selected === id}
-              onClick={() => {
-                // Navigate to the doc; doc-surface's effect picks up the chat.
-                selectDoc(s.documentId);
-              }}
-              onDelete={() => assistantStore.getState().deleteSession(id)}
-            />
-          );
-        })}
-      </SidebarSection>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto pb-2">
+        <SidebarSection label="Chats" count={sortedIds.length}>
+          {sortedIds.map((id) => {
+            const s = sessions[id]!;
+            const docRow = docsById.get(s.documentId);
+            if (!docRow) return null;
+            return (
+              <SessionRow
+                key={id}
+                title={docRow.title || "Untitled"}
+                emoji={docRow.emoji}
+                updatedAt={s.updatedAt}
+                active={selected === id}
+                onClick={() => selectDoc(s.documentId)}
+                onDelete={() => assistantStore.getState().deleteSession(id)}
+              />
+            );
+          })}
+        </SidebarSection>
+      </div>
+      <div className="border-t border-(--rule) py-2">
+        <SidebarNavLink to="/skills" icon={Zap} label="Skills" />
+        <SidebarNavLink to="/settings" icon={Settings} label="Configuration" />
+      </div>
     </div>
   );
 }

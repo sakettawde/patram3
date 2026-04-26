@@ -94,7 +94,19 @@ const appIndexRoute = createRoute({
   path: "/",
   component: DocSurface,
 });
-const testRouteTree = rootRoute.addChildren([appRoute.addChildren([appIndexRoute])]);
+const skillsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "skills",
+  component: () => <div>Skills page (test stub)</div>,
+});
+const settingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "settings",
+  component: () => <div>Settings page (test stub)</div>,
+});
+const testRouteTree = rootRoute.addChildren([
+  appRoute.addChildren([appIndexRoute, skillsRoute, settingsRoute]),
+]);
 
 async function renderShell(initialPath: string = "/") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -169,6 +181,19 @@ describe("<AppShell />", () => {
     expect(assistantStore.getState().open).toBe(true);
     fireEvent.click(screen.getByLabelText("Toggle assistant"));
     expect(assistantStore.getState().open).toBe(false);
+  });
+
+  test("Sessions tab shows pinned Skills and Configuration links", async () => {
+    await renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+    expect(screen.getByRole("link", { name: "Skills" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Configuration" })).toBeTruthy();
+  });
+
+  test("Docs tab does NOT show the Skills/Configuration footer", async () => {
+    await renderShell();
+    expect(screen.queryByRole("link", { name: "Skills" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Configuration" })).toBeNull();
   });
 
   test("Ctrl+/ toggles the assistant; Ctrl+\\ does not", async () => {
