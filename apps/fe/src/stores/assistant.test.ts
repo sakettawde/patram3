@@ -339,4 +339,62 @@ describe("AssistantStore", () => {
     expect(s.getState().streaming?.status).toBe("error");
     expect(s.getState().streaming?.errorMessage).toContain("network_down");
   });
+
+  test("cancel-then-resend keeps the new stream cancellable", async () => {
+    const apiMod = await import("#/lib/assistant-api");
+    let secondAbortFired = false;
+
+    // First stream: hang until aborted.
+    (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
+      ) => {
+        opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
+        opts.onEvent({ type: "text_delta", delta: "first-partial" });
+        await new Promise<void>((r) => opts.signal?.addEventListener("abort", () => r()));
+      },
+    );
+
+    // Second stream: hang and record whether its abort fires.
+    (apiMod.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
+      ) => {
+        opts.onEvent({ type: "message_start", id: "m2", createdAt: 2 });
+        opts.onEvent({ type: "text_delta", delta: "second-partial" });
+        await new Promise<void>((r) => {
+          opts.signal?.addEventListener("abort", () => {
+            secondAbortFired = true;
+            r();
+          });
+        });
+      },
+    );
+
+    const s = createAssistantStore();
+    s.getState().createSession();
+
+    // Start first send and let the mock enqueue events.
+    const p1 = s.getState().sendMessage("first");
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    // Cancel the first stream; its finally block runs asynchronously.
+    s.getState().cancelStreaming();
+
+    // Immediately start the second send BEFORE the first finally can run.
+    const p2 = s.getState().sendMessage("second");
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    // Cancel the second stream — must fire even though the first finally
+    // ran concurrently and tried to delete from streamControllers.
+    s.getState().cancelStreaming();
+
+    await Promise.all([p1, p2]);
+
+    expect(secondAbortFired).toBe(true);
+  });
 });

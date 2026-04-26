@@ -390,7 +390,11 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
               });
             }
           } finally {
-            streamControllers.delete(sid);
+            // Only delete our controller if it's still the active one
+            // (a subsequent sendMessage may have installed a fresh controller).
+            if (streamControllers.get(sid) === ac) {
+              streamControllers.delete(sid);
+            }
             set((st) => {
               if (!st.pendingSessionIds[sid]) return st;
               const nextPending = { ...st.pendingSessionIds };
