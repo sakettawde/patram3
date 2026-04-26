@@ -6,6 +6,6 @@ describe("<BootLoader />", () => {
   test("renders a status region with the patram wordmark", () => {
     render(<BootLoader />);
     const status = screen.getByRole("status");
-    expect(status.textContent).toContain("patram");
+    expect(status.textContent).toContain("Patram");
   });
 });
