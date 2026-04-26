@@ -187,10 +187,18 @@ app.post("/sessions/:sessionId/messages", async (c) => {
 
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // Track in-flight propose_* acks. Cloudflare Workers can tear down the
+      // execution context as soon as the response stream closes, which would
+      // abandon any unresolved promises — including these acks. If even one
+      // ack is dropped, the next user.message hits a 400 ("waiting on
+      // responses to events [...]"). So we collect the ack promises and
+      // await them before returning from start().
+      const pendingAcks: Promise<unknown>[] = [];
+
       try {
         for await (const ev of stream) {
-          // Task 5: Auto-ack propose_* tool calls so the agent keeps streaming.
-          // SDK v0.91.1: the event type is "user.custom_tool_result" with field
+          // Auto-ack propose_* tool calls so the agent keeps streaming.
+          // SDK v0.91.1: event type "user.custom_tool_result", field
           // "custom_tool_use_id" (verified in events.d.ts).
           if (
             ev &&
@@ -201,31 +209,38 @@ app.post("/sessions/:sessionId/messages", async (c) => {
             typeof (ev as { id?: string }).id === "string"
           ) {
             const customToolUseId = (ev as { id: string }).id;
-            client.beta.sessions.events
-              .send(sessionId, {
-                events: [
-                  {
-                    type: "user.custom_tool_result",
-                    custom_tool_use_id: customToolUseId,
-                    content: [{ type: "text", text: "ok" }],
-                  },
-                ],
-              })
-              .catch(() => undefined);
+            pendingAcks.push(
+              client.beta.sessions.events
+                .send(sessionId, {
+                  events: [
+                    {
+                      type: "user.custom_tool_result",
+                      custom_tool_use_id: customToolUseId,
+                      content: [{ type: "text", text: "ok" }],
+                    },
+                  ],
+                })
+                .catch(() => undefined),
+            );
           }
 
           for (const wire of translate(ev)) {
             controller.enqueue(encodeSSE(wire));
             if (wire.type === "message_end") {
+              await Promise.all(pendingAcks);
               controller.close();
               return;
             }
           }
         }
         // Fallback: iterator ended without an idle/terminated event.
+        await Promise.all(pendingAcks);
         controller.enqueue(encodeSSE({ type: "message_end" }));
         controller.close();
       } catch (err) {
+        // Even on stream error, drain any in-flight acks so the session
+        // doesn't end up wedged waiting on tool results.
+        await Promise.all(pendingAcks).catch(() => undefined);
         controller.enqueue(
           encodeSSE({
             type: "error",
