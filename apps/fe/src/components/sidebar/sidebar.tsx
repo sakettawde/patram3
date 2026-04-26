@@ -4,7 +4,7 @@ import { useUi } from "#/stores/ui";
 import { DocsList } from "./docs-list";
 import { SessionsList } from "./sessions-list";
 import { SidebarTabs } from "./sidebar-tabs";
-import { UserChip } from "./user-chip";
+import { ProfileMenu } from "#/components/profile-menu";
 
 export function Sidebar({
   collapsed,
@@ -36,7 +36,7 @@ export function Sidebar({
           </div>
           <SidebarTabs />
           {tab === "docs" ? <DocsList /> : <SessionsList />}
-          <UserChip name="Saket" />
+          <ProfileMenu />
         </>
       )}
       {collapsed && (
