@@ -248,8 +248,8 @@ pre code {
 .boot-loader__wordmark {
   font-family: var(--font-sans);
   font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--ink);
   display: inline-block;
   will-change: opacity, transform, letter-spacing;
@@ -261,12 +261,12 @@ pre code {
   from {
     opacity: 0;
     transform: translateY(4px);
-    letter-spacing: -0.04em;
+    letter-spacing: -0.05em;
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.025em;
   }
 }
 @keyframes boot-pulse {
