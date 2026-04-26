@@ -4,12 +4,19 @@
   "scripts": {
     "dev": "vp exec wrangler dev",
     "deploy": "vp exec wrangler deploy --minify",
-    "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings",
+    "test": "vp test run --passWithNoTests"
   },
   "dependencies": {
-    "hono": "^4.12.14"
+    "@anthropic-ai/sdk": "catalog:",
+    "drizzle-orm": "catalog:",
+    "hono": "^4.12.14",
+    "nanoid": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "drizzle-kit": "catalog:",
+    "vite-plus": "catalog:",
     "wrangler": "^4.4.0"
   }
 }

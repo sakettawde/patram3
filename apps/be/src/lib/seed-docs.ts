@@ -1,63 +1,54 @@
-import type { JSONContent } from "@tiptap/react";
-import type { Doc, DocumentsState } from "#/stores/documents";
 import { nanoid } from "nanoid";
+import { ensureBlockIds } from "./document-markdown";
 
-function heading(level: 1 | 2 | 3, text: string): JSONContent {
+type SeedRow = {
+  id: string;
+  userId: string;
+  title: string;
+  emoji: string;
+  tag: string | null;
+  contentJson: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type Block = Record<string, unknown>;
+
+function heading(level: 1 | 2 | 3, text: string): Block {
   return { type: "heading", attrs: { level }, content: [{ type: "text", text }] };
 }
-function para(text: string): JSONContent {
+function para(text: string): Block {
   return { type: "paragraph", content: [{ type: "text", text }] };
 }
-function task(text: string, checked = false): JSONContent {
-  return {
-    type: "taskItem",
-    attrs: { checked },
-    content: [para(text)],
-  };
+function task(text: string, checked = false): Block {
+  return { type: "taskItem", attrs: { checked }, content: [para(text)] };
 }
-function tasks(items: Array<{ text: string; done?: boolean }>): JSONContent {
+function tasks(items: Array<{ text: string; done?: boolean }>): Block {
   return { type: "taskList", content: items.map((i) => task(i.text, i.done ?? false)) };
 }
-function bullet(items: string[]): JSONContent {
+function bullet(items: string[]): Block {
   return {
     type: "bulletList",
     content: items.map((t) => ({ type: "listItem", content: [para(t)] })),
   };
 }
-function quote(text: string): JSONContent {
+function quote(text: string): Block {
   return { type: "blockquote", content: [para(text)] };
 }
-function callout(emoji: string, text: string): JSONContent {
-  return {
-    type: "callout",
-    attrs: { emoji },
-    content: [para(text)],
-  };
+function callout(emoji: string, text: string): Block {
+  return { type: "callout", attrs: { emoji }, content: [para(text)] };
 }
 
-function doc(partial: Partial<Doc> & Pick<Doc, "title" | "emoji" | "contentJson">): Doc {
-  return {
-    id: nanoid(8),
-    title: partial.title,
-    emoji: partial.emoji,
-    tag: partial.tag ?? null,
-    contentJson: partial.contentJson,
-    wordCount: partial.wordCount ?? 0,
-    updatedAt: partial.updatedAt ?? Date.now(),
-    pinned: partial.pinned ?? false,
-  };
-}
-
-export function seedDocuments(): DocumentsState {
-  const now = Date.now();
-  const list: Doc[] = [
-    doc({
+export function buildSeedDocs(userId: string, now: number): SeedRow[] {
+  const rows: Array<
+    Omit<SeedRow, "id" | "userId" | "createdAt" | "updatedAt"> & { offset: number }
+  > = [
+    {
+      offset: 0,
       title: "Onboarding notes",
       emoji: "🌿",
-      pinned: true,
       tag: "guide",
-      updatedAt: now - 60 * 60_000,
-      contentJson: {
+      contentJson: JSON.stringify({
         type: "doc",
         content: [
           heading(1, "Onboarding notes"),
@@ -69,15 +60,14 @@ export function seedDocuments(): DocumentsState {
             { text: "Write your first retro" },
           ]),
         ],
-      },
-    }),
-    doc({
+      }),
+    },
+    {
+      offset: 1,
       title: "Product principles",
       emoji: "📐",
-      pinned: true,
       tag: "values",
-      updatedAt: now - 3 * 60 * 60_000,
-      contentJson: {
+      contentJson: JSON.stringify({
         type: "doc",
         content: [
           heading(1, "Product principles"),
@@ -88,14 +78,14 @@ export function seedDocuments(): DocumentsState {
             "Small delights, never loud ones.",
           ]),
         ],
-      },
-    }),
-    doc({
+      }),
+    },
+    {
+      offset: 2,
       title: "Retro — April",
       emoji: "📝",
       tag: "retro",
-      updatedAt: now - 20 * 60_000,
-      contentJson: {
+      contentJson: JSON.stringify({
         type: "doc",
         content: [
           heading(1, "Retro — April"),
@@ -108,14 +98,14 @@ export function seedDocuments(): DocumentsState {
           tasks([{ text: "Cut scope earlier when a week slips" }]),
           callout("💡", "The fastest improvement is often the one you already agreed to."),
         ],
-      },
-    }),
-    doc({
+      }),
+    },
+    {
+      offset: 3,
       title: "Q2 planning",
       emoji: "🌊",
       tag: "planning",
-      updatedAt: now - 2 * 60_000,
-      contentJson: {
+      contentJson: JSON.stringify({
         type: "doc",
         content: [
           heading(1, "Q2 planning"),
@@ -132,15 +122,27 @@ export function seedDocuments(): DocumentsState {
           heading(2, "Open questions"),
           para(""),
         ],
-      },
-    }),
+      }),
+    },
   ];
 
-  const docs: Record<string, Doc> = {};
-  const order: string[] = [];
-  for (const d of list) {
-    docs[d.id] = d;
-    order.push(d.id);
-  }
-  return { docs, order, selectedId: order[order.length - 1] ?? null };
+  return rows.map((r) => {
+    // Ensure every top-level block in the seeded doc carries a stable id —
+    // same contract as the FE's UniqueID extension. Without this, the agent
+    // would see ids the FE never had, breaking the propose-edit pipeline.
+    const parsed = JSON.parse(r.contentJson);
+    ensureBlockIds(parsed);
+    return {
+      id: nanoid(8),
+      userId,
+      title: r.title,
+      emoji: r.emoji,
+      tag: r.tag,
+      contentJson: JSON.stringify(parsed),
+      createdAt: now + r.offset,
+      updatedAt: now + r.offset,
+    };
+  });
 }
+
+export type { SeedRow };

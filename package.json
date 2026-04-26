@@ -8,6 +8,9 @@
     "dev": "vp run -F './apps/*' dev",
     "dev:fe": "vp run fe#dev",
     "dev:be": "vp run be#dev",
+    "deploy": "vp run be#deploy && vp run fe#deploy",
+    "deploy:be": "vp run be#deploy",
+    "deploy:fe": "vp run fe#deploy",
     "prepare": "vp config"
   },
   "devDependencies": {

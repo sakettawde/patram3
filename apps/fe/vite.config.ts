@@ -15,7 +15,7 @@ const config = defineConfig({
     devtools(),
     ...(isTest ? [] : [cloudflare({ viteEnvironment: { name: "ssr" } })]),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({ spa: { enabled: true } }),
     viteReact(),
   ],
   test: {
