@@ -10,12 +10,14 @@ import { cn } from "#/lib/utils";
 
 export function SessionRow({
   title,
+  emoji,
   updatedAt,
   active,
   onClick,
   onDelete,
 }: {
   title: string;
+  emoji?: string;
   updatedAt: number;
   active: boolean;
   onClick: () => void;
@@ -35,7 +37,12 @@ export function SessionRow({
         onClick={onClick}
         className="flex flex-1 items-center gap-2 overflow-hidden text-left"
       >
-        <span className="truncate">{title || "New chat"}</span>
+        {emoji ? (
+          <span aria-hidden className="shrink-0">
+            {emoji}
+          </span>
+        ) : null}
+        <span className="truncate">{title || "Untitled"}</span>
         <span className="ml-auto shrink-0 text-[11px] text-(--ink-faint)">
           {formatRelativeTime(updatedAt)}
         </span>

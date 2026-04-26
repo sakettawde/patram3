@@ -4,6 +4,7 @@ import { Editor } from "#/components/editor/editor";
 import { ReviewBar } from "#/components/editor/review-bar";
 import { useDocumentsQuery, useUpdateDoc } from "#/queries/documents";
 import { useDocuments } from "#/stores/documents";
+import { useAssistant } from "#/stores/assistant";
 import { proposalsStore, useProposals, type Proposal } from "#/stores/proposals";
 import { markdownToHtml } from "#/lib/markdown-to-html";
 import { DOMParser as PMDOMParser, type Node as PMNode } from "@tiptap/pm/model";
@@ -31,6 +32,12 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
     () => query.data?.find((d) => d.id === selectedId) ?? null,
     [query.data, selectedId],
   );
+
+  const selectSessionForDoc = useAssistant((s) => s.selectSessionForDoc);
+  useEffect(() => {
+    if (!doc) return;
+    selectSessionForDoc(doc.id);
+  }, [doc?.id, selectSessionForDoc]);
 
   const updater = useUpdateDoc(user.id, doc?.id ?? null);
   const saveState = useSyncExternalStore<SaveState>(
