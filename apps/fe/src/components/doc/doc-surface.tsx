@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useUser } from "#/auth/auth-gate";
 import { Editor } from "#/components/editor/editor";
+import { ReviewBar } from "#/components/editor/review-bar";
 import { useDocumentsQuery, useUpdateDoc } from "#/queries/documents";
 import { useDocuments } from "#/stores/documents";
+import { proposalsStore, useProposals, type Proposal } from "#/stores/proposals";
+import { markdownToHtml } from "#/lib/markdown-to-html";
+import { DOMParser as PMDOMParser, type Node as PMNode } from "@tiptap/pm/model";
+import type { Editor as TiptapEditor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/react";
 
 type SaveState = "idle" | "saving";
@@ -59,6 +64,97 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
   // Track the last sent title heading to avoid scheduling no-op patches.
   const [lastSent, setLastSent] = useState<{ titleHeading: string }>({ titleHeading: "" });
 
+  // Proposals + editor handle.
+  const proposals = useProposals((s) => (doc ? (s.byDoc[doc.id] ?? []) : []));
+  const editorRef = useRef<TiptapEditor | null>(null);
+
+  const onEditorReady = useCallback((ed: TiptapEditor) => {
+    editorRef.current = ed;
+  }, []);
+
+  const acceptProposal = useCallback(
+    (proposalId: string) => {
+      if (!doc) return;
+      const list = proposalsStore.getState().byDoc[doc.id] ?? [];
+      const p = list.find((x) => x.id === proposalId);
+      if (!p) return;
+      applyProposalToEditor(p, editorRef.current);
+      proposalsStore.getState().removeProposal(doc.id, proposalId);
+    },
+    [doc],
+  );
+
+  const rejectProposal = useCallback(
+    (proposalId: string) => {
+      if (!doc) return;
+      proposalsStore.getState().removeProposal(doc.id, proposalId);
+    },
+    [doc],
+  );
+
+  const acceptAll = useCallback(() => {
+    if (!doc) return;
+    const list = [...(proposalsStore.getState().byDoc[doc.id] ?? [])];
+    list.sort((a, b) => orderInDoc(a, b, editorRef.current));
+    for (const p of list) applyProposalToEditor(p, editorRef.current);
+    proposalsStore.getState().clearProposals(doc.id);
+  }, [doc]);
+
+  const rejectAll = useCallback(() => {
+    if (!doc) return;
+    proposalsStore.getState().clearProposals(doc.id);
+  }, [doc]);
+
+  const proposalCallbacks = useMemo(
+    () => ({
+      onAccept: acceptProposal,
+      onReject: rejectProposal,
+      renderContent: (md: string) => markdownToHtml(md),
+    }),
+    [acceptProposal, rejectProposal],
+  );
+
+  // Convert store Proposal[] to ProposalForPlugin[] for the editor.
+  const proposalsForPlugin = useMemo(
+    () =>
+      proposals.map((p) => ({
+        id: p.id,
+        kind: p.kind,
+        blockId: p.blockId,
+        afterBlockId: p.afterBlockId,
+        content: p.content,
+      })),
+    [proposals],
+  );
+
+  const handleEditorChange = useCallback(
+    ({ json, title }: { json: JSONContent; title: string }) => {
+      const patch: { contentJson: JSONContent; title?: string } = { contentJson: json };
+      if (title && title !== lastSent.titleHeading) {
+        patch.title = title;
+        setLastSent({ titleHeading: title });
+      }
+      updater.schedule(patch);
+
+      // Auto-reject proposals whose target block disappeared (user edited it
+      // away or accepted an earlier proposal that removed it).
+      if (!doc) return;
+      const currentList = proposalsStore.getState().byDoc[doc.id] ?? [];
+      if (currentList.length === 0) return;
+      const blockIds = new Set<string>();
+      walkBlocks(json, (block) => {
+        if (typeof block.attrs?.id === "string") blockIds.add(block.attrs.id);
+      });
+      for (const p of currentList) {
+        if (p.kind === "insert_after") continue;
+        if (!blockIds.has(p.blockId)) {
+          proposalsStore.getState().removeProposal(doc.id, p.id);
+        }
+      }
+    },
+    [doc, lastSent, updater],
+  );
+
   if (!doc) {
     return (
       <div className="mx-auto max-w-170 px-6 pt-32 text-center text-[14px] text-(--ink-faint)">
@@ -71,21 +167,91 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
 
   return (
     <div className="mx-auto w-full max-w-170 px-6 pt-20 pb-24">
+      <ReviewBar
+        count={proposalsForPlugin.length}
+        onAcceptAll={acceptAll}
+        onRejectAll={rejectAll}
+      />
       <Editor
         docId={doc.id}
         initialContent={initial}
-        onChange={({ json, title }) => {
-          const patch: { contentJson: JSONContent; title?: string } = { contentJson: json };
-          if (title && title !== lastSent.titleHeading) {
-            patch.title = title;
-            setLastSent({ titleHeading: title });
-          }
-          updater.schedule(patch);
-        }}
+        onChange={handleEditorChange}
         onBlur={() => {
           void updater.flush();
         }}
+        proposals={proposalsForPlugin}
+        proposalCallbacks={proposalCallbacks}
+        onReady={onEditorReady}
       />
     </div>
   );
+}
+
+// ---- helpers ----
+
+function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
+  if (!editor) return;
+  const view = editor.view;
+  if (p.kind === "delete") {
+    const target = findBlockPos(view.state.doc, p.blockId);
+    if (!target) return;
+    view.dispatch(view.state.tr.delete(target.pos, target.pos + target.size));
+    return;
+  }
+  if (p.kind === "replace") {
+    const target = findBlockPos(view.state.doc, p.blockId);
+    if (!target) return;
+    const slice = parseMarkdownToSlice(p.content ?? "", view);
+    view.dispatch(view.state.tr.replace(target.pos, target.pos + target.size, slice));
+    return;
+  }
+  if (p.kind === "insert_after") {
+    const insertPos =
+      p.afterBlockId === "TOP"
+        ? 0
+        : (() => {
+            const t = findBlockPos(view.state.doc, p.afterBlockId ?? "");
+            return t ? t.pos + t.size : null;
+          })();
+    if (insertPos === null) return;
+    const slice = parseMarkdownToSlice(p.content ?? "", view);
+    view.dispatch(view.state.tr.replace(insertPos, insertPos, slice));
+  }
+}
+
+function parseMarkdownToSlice(
+  md: string,
+  view: { state: { schema: import("@tiptap/pm/model").Schema } },
+) {
+  const dom = document.createElement("div");
+  dom.innerHTML = markdownToHtml(md);
+  return PMDOMParser.fromSchema(view.state.schema).parseSlice(dom);
+}
+
+function findBlockPos(doc: PMNode, id: string): { pos: number; size: number } | null {
+  let found: { pos: number; size: number } | null = null;
+  doc.descendants((node, pos) => {
+    if (found) return false;
+    if (node.attrs?.id === id) {
+      found = { pos, size: node.nodeSize };
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+function orderInDoc(a: Proposal, b: Proposal, editor: TiptapEditor | null): number {
+  if (!editor) return 0;
+  const ap = findBlockPos(editor.view.state.doc, a.blockId)?.pos ?? Number.MAX_SAFE_INTEGER;
+  const bp = findBlockPos(editor.view.state.doc, b.blockId)?.pos ?? Number.MAX_SAFE_INTEGER;
+  return ap - bp;
+}
+
+function walkBlocks(node: JSONContent, visit: (block: JSONContent) => void): void {
+  if (!node.content) return;
+  for (const child of node.content) {
+    visit(child);
+    walkBlocks(child, visit);
+  }
 }

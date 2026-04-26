@@ -1,7 +1,14 @@
-import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
+import { Editor as TiptapEditor, EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import { useEffect, useMemo, useRef } from "react";
 import { BubbleMenu } from "./bubble-menu";
 import { buildExtensions } from "./extensions";
+import {
+  buildProposalsPlugin,
+  pushProposalsToView,
+  proposalPluginKey,
+  type ProposalForPlugin,
+  type ProposalCallbacks,
+} from "./proposal-decorations";
 
 export type EditorChange = { json: JSONContent; wordCount: number; title: string };
 
@@ -10,6 +17,9 @@ export type EditorProps = {
   initialContent: JSONContent;
   onChange: (change: EditorChange) => void;
   onBlur?: () => void;
+  proposals: ProposalForPlugin[];
+  proposalCallbacks: ProposalCallbacks;
+  onReady?: (editor: TiptapEditor) => void;
 };
 
 function extractTitle(json: JSONContent): string {
@@ -24,12 +34,37 @@ function extractTitle(json: JSONContent): string {
   return "";
 }
 
-export function Editor({ docId, initialContent, onChange, onBlur }: EditorProps) {
+export function Editor({
+  docId,
+  initialContent,
+  onChange,
+  onBlur,
+  proposals,
+  proposalCallbacks,
+  onReady,
+}: EditorProps) {
   const extensions = useMemo(() => buildExtensions(), []);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  const callbacksRef = useRef(proposalCallbacks);
+  useEffect(() => {
+    callbacksRef.current = proposalCallbacks;
+  }, [proposalCallbacks]);
+
+  // Build the plugin once. Callbacks read through the ref so they stay current
+  // without re-installing the plugin.
+  const proposalsPlugin = useMemo(
+    () =>
+      buildProposalsPlugin({
+        onAccept: (id) => callbacksRef.current.onAccept(id),
+        onReject: (id) => callbacksRef.current.onReject(id),
+        renderContent: (md) => callbacksRef.current.renderContent(md),
+      }),
+    [],
+  );
 
   const editor = useEditor(
     {
@@ -62,6 +97,26 @@ export function Editor({ docId, initialContent, onChange, onBlur }: EditorProps)
     },
     [docId],
   );
+
+  // Register the proposals plugin once on mount.
+  useEffect(() => {
+    if (!editor) return;
+    editor.registerPlugin(proposalsPlugin);
+    onReady?.(editor);
+    return () => {
+      editor.unregisterPlugin(proposalPluginKey);
+    };
+  }, [editor, proposalsPlugin, onReady]);
+
+  // Push fresh proposals on every change.
+  useEffect(() => {
+    if (!editor) return;
+    pushProposalsToView(editor.view, proposals, {
+      onAccept: (id) => callbacksRef.current.onAccept(id),
+      onReject: (id) => callbacksRef.current.onReject(id),
+      renderContent: (md) => callbacksRef.current.renderContent(md),
+    });
+  }, [editor, proposals]);
 
   if (!editor) return null;
   return (
