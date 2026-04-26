@@ -89,35 +89,38 @@ vp add -D @cloudflare/vitest-pool-workers
 Add to `"scripts"`:
 
 ```jsonc
-"test": "vp test run"
+"test": "vp test run --passWithNoTests"
 ```
+
+(`--passWithNoTests` is required so the script exits 0 when no test files exist yet — needed only for this initial commit; it is harmless once tests land.)
 
 - [ ] **Step 4: Create `apps/be/vitest.config.ts`.**
 
 ```ts
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vite-plus";
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: {
-          d1Databases: ["DB"],
-        },
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      miniflare: {
+        d1Databases: ["DB"],
       },
-    },
-  },
+    }),
+  ],
 });
 ```
 
-- [ ] **Step 5: Verify `vp test` runs (no tests yet, must exit 0).**
+(The `@cloudflare/vitest-pool-workers/config` subpath that older docs reference does not exist in v0.15.0+ — `cloudflareTest` is the current entry point. `defineConfig` comes from `vite-plus` per the project-wide rule in `CLAUDE.md`. `vite-plus` must also be added to `apps/be` devDeps.)
+
+- [ ] **Step 5: Verify `vp run test` runs (no tests yet, must exit 0).**
 
 ```bash
-cd apps/be && vp test
+cd apps/be && vp run test
 ```
 
-Expected: 0 test files, exit 0.
+Expected: "No test files found", exit 0.
 
 - [ ] **Step 6: Commit.**
 
