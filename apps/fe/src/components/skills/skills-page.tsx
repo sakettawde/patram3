@@ -4,7 +4,7 @@ import {
   Database,
   FileText,
   Globe,
-  Image,
+  Image as ImageIcon,
   Languages,
   Plus,
   Terminal,
@@ -38,7 +38,7 @@ const MOCK_SKILLS: MockSkill[] = [
     id: "image-gen",
     name: "Image generation",
     description: "Generate images from a prompt.",
-    icon: Image,
+    icon: ImageIcon,
     enabled: false,
   },
   {
