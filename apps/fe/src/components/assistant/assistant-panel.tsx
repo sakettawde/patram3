@@ -13,6 +13,9 @@ export function AssistantPanel() {
   const pending = useAssistant((s) =>
     s.selectedSessionId ? Boolean(s.pendingSessionIds[s.selectedSessionId]) : false,
   );
+  const sendMessage = useAssistant((s) => s.sendMessage);
+  const cancelStreaming = useAssistant((s) => s.cancelStreaming);
+  const streaming = useAssistant((s) => s.streaming);
 
   // Auto-create a session on first open if none exists.
   useEffect(() => {
@@ -25,6 +28,8 @@ export function AssistantPanel() {
     return <PanelChrome />;
   }
 
+  const isStreaming = streaming?.sessionId === sessionId && streaming?.status === "streaming";
+
   return (
     <div className="flex h-full flex-col">
       <PanelHeader
@@ -33,7 +38,12 @@ export function AssistantPanel() {
         onClose={() => assistantStore.getState().setOpen(false)}
       />
       <MessageList sessionId={sessionId} messages={session.messages} pending={pending} />
-      <Composer disabled={pending} onSend={(text) => assistantStore.getState().sendMessage(text)} />
+      <Composer
+        disabled={!sessionId}
+        streaming={isStreaming}
+        onSend={(text, attachments) => void sendMessage(text, attachments)}
+        onStop={cancelStreaming}
+      />
     </div>
   );
 }

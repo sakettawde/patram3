@@ -1,7 +1,20 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { assistantStore } from "#/stores/assistant";
 import { AssistantPanel } from "./assistant-panel";
+
+vi.mock("#/lib/assistant-api", () => ({
+  createSession: vi.fn(async () => ({ sessionId: "asid", environmentId: "eid" })),
+  uploadFile: vi.fn(),
+  streamMessage: vi.fn(
+    async (_sid: string, _body: unknown, opts: { onEvent: (e: unknown) => void }) => {
+      opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
+      opts.onEvent({ type: "text_delta", delta: "ok" });
+      opts.onEvent({ type: "message_end" });
+    },
+  ),
+  cancel: vi.fn(),
+}));
 
 describe("<AssistantPanel />", () => {
   beforeEach(() => {
@@ -12,11 +25,11 @@ describe("<AssistantPanel />", () => {
       sessions: {},
       order: [],
       pendingSessionIds: {},
+      streaming: null,
     });
-    vi.useFakeTimers();
   });
   afterEach(() => {
-    vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   test("auto-creates a session on mount when none exists", () => {
@@ -25,22 +38,27 @@ describe("<AssistantPanel />", () => {
     screen.getByText("Start a conversation");
   });
 
-  test("typing + Enter sends a user message and shows the assistant reply after the timer", () => {
+  test("typing + Enter sends a user message and shows the assistant reply", async () => {
     render(<AssistantPanel />);
+    // Wait for the auto-created session to be available in the UI.
+    await waitFor(() => screen.getByLabelText("Message"));
     const ta = screen.getByLabelText("Message") as HTMLTextAreaElement;
-    fireEvent.change(ta, { target: { value: "hello" } });
-    fireEvent.keyDown(ta, { key: "Enter" });
+    await act(async () => {
+      fireEvent.change(ta, { target: { value: "hello" } });
+      fireEvent.keyDown(ta, { key: "Enter" });
+    });
     expect(screen.getAllByText("hello").length).toBeGreaterThanOrEqual(1);
     expect(ta.value).toBe("");
 
-    act(() => {
-      vi.advanceTimersByTime(1500);
+    await waitFor(() => {
+      const sid = assistantStore.getState().selectedSessionId!;
+      const msgs = assistantStore.getState().sessions[sid]!.messages;
+      expect(msgs).toHaveLength(2);
     });
 
-    const sid = assistantStore.getState().selectedSessionId!;
-    const msgs = assistantStore.getState().sessions[sid]!.messages;
-    expect(msgs).toHaveLength(2);
-    screen.getByText(msgs[1]!.content);
+    await waitFor(() => {
+      screen.getByText("ok");
+    });
   });
 
   test("Shift+Enter does NOT send", () => {
