@@ -49,6 +49,8 @@
     "radix-ui": "catalog:",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.1.18",
     "tippy.js": "catalog:",

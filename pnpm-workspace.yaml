@@ -32,6 +32,8 @@ catalog:
   drizzle-orm: ^0.45.2
   nanoid: ^5.1.9
   radix-ui: ^1.4.3
+  react-markdown: ^10.1.0
+  remark-gfm: ^4.0.1
   tippy.js: ^6.3.7
   tslib: ^2.8.1
   typescript: ^5
