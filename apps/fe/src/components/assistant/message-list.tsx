@@ -3,6 +3,7 @@ import { type ChatSession, useAssistant } from "#/stores/assistant";
 import { ActivityStrip } from "./activity-strip";
 import { Markdown } from "./markdown";
 import { MessageBubble } from "./message-bubble";
+import { ThinkingDots } from "./thinking-dots";
 
 export function MessageList({ session }: { session: ChatSession }) {
   const streaming = useAssistant((s) => s.streaming);
@@ -38,6 +39,9 @@ export function MessageList({ session }: { session: ChatSession }) {
         <div className="flex w-full justify-start">
           <div className="max-w-[88%] text-[13px] leading-relaxed text-(--ink)">
             <ActivityStrip items={streaming!.activity} />
+            {streaming!.status === "streaming" &&
+              streaming!.text === "" &&
+              streaming!.activity.length === 0 && <ThinkingDots />}
             <Markdown source={streaming!.text} />
             {streaming!.status === "error" && (
               <div className="mt-1 flex items-center gap-2 text-[12px] text-(--ink-faint)">
