@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { ensureBlockIds } from "./document-markdown";
 
 type SeedRow = {
   id: string;
@@ -125,16 +126,23 @@ export function buildSeedDocs(userId: string, now: number): SeedRow[] {
     },
   ];
 
-  return rows.map((r) => ({
-    id: nanoid(8),
-    userId,
-    title: r.title,
-    emoji: r.emoji,
-    tag: r.tag,
-    contentJson: r.contentJson,
-    createdAt: now + r.offset,
-    updatedAt: now + r.offset,
-  }));
+  return rows.map((r) => {
+    // Ensure every top-level block in the seeded doc carries a stable id —
+    // same contract as the FE's UniqueID extension. Without this, the agent
+    // would see ids the FE never had, breaking the propose-edit pipeline.
+    const parsed = JSON.parse(r.contentJson);
+    ensureBlockIds(parsed);
+    return {
+      id: nanoid(8),
+      userId,
+      title: r.title,
+      emoji: r.emoji,
+      tag: r.tag,
+      contentJson: JSON.stringify(parsed),
+      createdAt: now + r.offset,
+      updatedAt: now + r.offset,
+    };
+  });
 }
 
 export type { SeedRow };

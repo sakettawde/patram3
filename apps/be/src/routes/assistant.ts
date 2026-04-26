@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import { getAgentId, getClient } from "../lib/anthropic";
 import { translate, isProposeName, type WireEvent } from "../lib/assistant-translate";
-import { documentJsonToMarkdown } from "../lib/document-markdown";
+import { documentJsonToMarkdown, ensureBlockIds } from "../lib/document-markdown";
 import { withAuth } from "../middleware/auth";
 import { getDb } from "../db/client";
 import { documents } from "../db/schema";
@@ -10,6 +10,10 @@ import { documents } from "../db/schema";
 type Env = { Bindings: CloudflareBindings; Variables: { userId: string } };
 
 const app = new Hono<Env>();
+
+// Healthz is unauthed so external uptime monitors can hit it; everything else
+// goes through withAuth.
+app.get("/healthz", (c) => c.json({ ok: true }));
 
 app.use("*", withAuth());
 
@@ -62,8 +66,6 @@ function toContentBlocks(text: string, attachments: Attachment[]) {
 function encodeSSE(event: WireEvent): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
 }
-
-app.get("/healthz", (c) => c.json({ ok: true }));
 
 app.post("/sessions", async (c) => {
   const client = getClient(c.env);
@@ -132,11 +134,21 @@ app.post("/sessions/:sessionId/messages", async (c) => {
     .limit(1);
   if (!docRow) return c.json({ error: "document_not_found" }, 404);
 
-  // Parse contentJson and convert to Markdown for the agent context.
+  // Parse contentJson, defensively stamp any missing block ids, and convert to
+  // Markdown for the agent context. If we had to stamp ids, persist the result
+  // so the FE picks up the same ids on its next read — keeping the agent's view
+  // and the editor's view in sync.
   let docMarkdown = "";
   try {
-    const parsed = JSON.parse(docRow.contentJson) as unknown;
-    docMarkdown = documentJsonToMarkdown(parsed as Parameters<typeof documentJsonToMarkdown>[0]);
+    const parsed = JSON.parse(docRow.contentJson) as Parameters<typeof ensureBlockIds>[0];
+    if (ensureBlockIds(parsed)) {
+      const updatedContentJson = JSON.stringify(parsed);
+      await db
+        .update(documents)
+        .set({ contentJson: updatedContentJson, updatedAt: Date.now() })
+        .where(and(eq(documents.id, docRow.id), eq(documents.userId, userId)));
+    }
+    docMarkdown = documentJsonToMarkdown(parsed);
   } catch {
     // Fall back to empty string — the agent still gets the document header.
   }

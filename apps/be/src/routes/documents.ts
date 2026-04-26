@@ -5,6 +5,7 @@ import { getDb } from "../db/client";
 import { documents } from "../db/schema";
 import { withAuth } from "../middleware/auth";
 import { buildSeedDocs } from "../lib/seed-docs";
+import { ensureBlockIds } from "../lib/document-markdown";
 
 type Env = { Bindings: CloudflareBindings; Variables: { userId: string } };
 
@@ -30,10 +31,16 @@ app.get("/", async (c) => {
   return c.json(rows);
 });
 
-const DEFAULT_CONTENT = JSON.stringify({
-  type: "doc",
-  content: [{ type: "heading", attrs: { level: 1 } }],
-});
+function defaultDocContent(): string {
+  // Stamp the heading with an id at create-time so the FE's UniqueID extension
+  // and the BE's agent-context serializer agree on the id from the very first
+  // turn, before any FE autosave has had a chance to write back.
+  const doc = {
+    type: "doc",
+    content: [{ type: "heading", attrs: { level: 1, id: nanoid(8) } }],
+  };
+  return JSON.stringify(doc);
+}
 
 app.post("/", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Partial<{
@@ -45,14 +52,25 @@ app.post("/", async (c) => {
 
   const userId = c.get("userId");
   const now = Date.now();
+
+  // If the caller passed contentJson, ensure every top-level block carries an id
+  // before we persist — same contract as the FE's UniqueID extension.
+  let contentJson: string;
+  if (body.contentJson === undefined) {
+    contentJson = defaultDocContent();
+  } else {
+    const parsed = body.contentJson as Parameters<typeof ensureBlockIds>[0];
+    ensureBlockIds(parsed);
+    contentJson = JSON.stringify(parsed);
+  }
+
   const row = {
     id: nanoid(8),
     userId,
     title: typeof body.title === "string" && body.title.trim() ? body.title : "Untitled",
     emoji: typeof body.emoji === "string" && body.emoji ? body.emoji : "📝",
     tag: body.tag === null || body.tag === undefined ? null : String(body.tag),
-    contentJson:
-      body.contentJson === undefined ? DEFAULT_CONTENT : JSON.stringify(body.contentJson),
+    contentJson,
     createdAt: now,
     updatedAt: now,
   };

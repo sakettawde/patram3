@@ -20,6 +20,21 @@ export function documentJsonToMarkdown(doc: JSONNode): string {
   return out.join("\n");
 }
 
+// Stamps a stable id on every top-level block lacking one. Mirrors the FE's
+// UniqueID extension contract (same nanoid alphabet/length) so a doc created
+// on the BE never diverges from what the FE editor stamps client-side.
+// Returns true if the doc was mutated.
+export function ensureBlockIds(doc: JSONNode): boolean {
+  if (doc.type !== "doc" || !Array.isArray(doc.content)) return false;
+  let mutated = false;
+  for (const block of doc.content) {
+    if (typeof block.attrs?.id === "string" && block.attrs.id) continue;
+    block.attrs = { ...block.attrs, id: nanoid(8) };
+    mutated = true;
+  }
+  return mutated;
+}
+
 function renderBlock(node: JSONNode): string {
   switch (node.type) {
     case "heading": {
