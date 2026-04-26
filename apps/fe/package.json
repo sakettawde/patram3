@@ -23,6 +23,7 @@
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
+    "@tiptap/core": "catalog:",
     "@tiptap/extension-bubble-menu": "catalog:",
     "@tiptap/extension-character-count": "catalog:",
     "@tiptap/extension-color": "catalog:",

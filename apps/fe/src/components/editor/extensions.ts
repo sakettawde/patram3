@@ -8,6 +8,7 @@ import type { Extensions } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CalloutNode } from "./callout-node";
 import { SlashCommandsExtension } from "./slash-extension";
+import { UniqueID } from "./unique-id";
 
 export function buildExtensions(): Extensions {
   return [
@@ -32,5 +33,6 @@ export function buildExtensions(): Extensions {
     CharacterCount,
     CalloutNode,
     SlashCommandsExtension,
+    UniqueID,
   ];
 }
