@@ -195,11 +195,34 @@ app.post("/sessions/:sessionId/messages", async (c) => {
       // await them before returning from start().
       const pendingAcks: Promise<unknown>[] = [];
 
+      // Tool-use ids we've already sent a custom_tool_result for. The agent
+      // can emit multiple custom_tool_use events in a single turn; if one
+      // arrives after a `requires_action` idle (or if only some make it into
+      // our event stream while others are surfaced via stop_reason.event_ids),
+      // we de-dupe via this set.
+      const ackedToolUseIds = new Set<string>();
+
+      const ackToolUse = (toolUseId: string) => {
+        if (ackedToolUseIds.has(toolUseId)) return;
+        ackedToolUseIds.add(toolUseId);
+        pendingAcks.push(
+          client.beta.sessions.events
+            .send(sessionId, {
+              events: [
+                {
+                  type: "user.custom_tool_result",
+                  custom_tool_use_id: toolUseId,
+                  content: [{ type: "text", text: "ok" }],
+                },
+              ],
+            })
+            .catch(() => undefined),
+        );
+      };
+
       try {
         for await (const ev of stream) {
           // Auto-ack propose_* tool calls so the agent keeps streaming.
-          // SDK v0.91.1: event type "user.custom_tool_result", field
-          // "custom_tool_use_id" (verified in events.d.ts).
           if (
             ev &&
             typeof ev === "object" &&
@@ -208,20 +231,32 @@ app.post("/sessions/:sessionId/messages", async (c) => {
             isProposeName((ev as { name: string }).name) &&
             typeof (ev as { id?: string }).id === "string"
           ) {
-            const customToolUseId = (ev as { id: string }).id;
-            pendingAcks.push(
-              client.beta.sessions.events
-                .send(sessionId, {
-                  events: [
-                    {
-                      type: "user.custom_tool_result",
-                      custom_tool_use_id: customToolUseId,
-                      content: [{ type: "text", text: "ok" }],
-                    },
-                  ],
-                })
-                .catch(() => undefined),
-            );
+            ackToolUse((ev as { id: string }).id);
+          }
+
+          // When the session goes idle waiting on tool results, the idle
+          // event lists every blocked tool_use_id in stop_reason.event_ids.
+          // Some of those ids may belong to tool_use events we never saw in
+          // our event stream (the agent can emit multiple in one model turn
+          // with out-of-order processing). Ack any we haven't covered yet —
+          // failure to ack even one leaves the session wedged for the next
+          // user.message.
+          if (
+            ev &&
+            typeof ev === "object" &&
+            (ev as { type?: string }).type === "session.status_idle"
+          ) {
+            const stop = (ev as { stop_reason?: { type?: unknown; event_ids?: unknown } })
+              .stop_reason;
+            if (stop && stop.type === "requires_action" && Array.isArray(stop.event_ids)) {
+              for (const id of stop.event_ids) {
+                if (typeof id === "string") ackToolUse(id);
+              }
+              // Don't close the stream — the agent will resume after the
+              // acks land and may emit more events. translate() returns []
+              // for requires_action idles so no message_end is enqueued.
+              continue;
+            }
           }
 
           for (const wire of translate(ev)) {

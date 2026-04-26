@@ -172,7 +172,20 @@ export function translate(ev: unknown): WireEvent[] {
       ];
     }
 
-    case "session.status_idle":
+    case "session.status_idle": {
+      // The session can go idle for three reasons:
+      //   - end_turn         — the turn finished naturally; we close the stream.
+      //   - retries_exhausted— same: nothing more is coming.
+      //   - requires_action  — the agent is waiting for user input (e.g. an
+      //                        unresolved custom_tool_use). The route handler
+      //                        is responsible for sending the ack(s); we must
+      //                        NOT emit message_end or the FE would close the
+      //                        stream prematurely. Drop silently here and let
+      //                        the route resume the agent.
+      const stop = e.stop_reason as { type?: unknown } | undefined;
+      if (stop && stop.type === "requires_action") return [];
+      return [{ type: "message_end" }];
+    }
     case "session.status_terminated":
     case "session.deleted":
       return [{ type: "message_end" }];
