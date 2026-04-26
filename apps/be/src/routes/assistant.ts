@@ -1,10 +1,17 @@
 import { Hono } from "hono";
+import { eq, and } from "drizzle-orm";
 import { getAgentId, getClient } from "../lib/anthropic";
-import { translate, type WireEvent } from "../lib/assistant-translate";
+import { translate, isProposeName, type WireEvent } from "../lib/assistant-translate";
+import { documentJsonToMarkdown } from "../lib/document-markdown";
+import { withAuth } from "../middleware/auth";
+import { getDb } from "../db/client";
+import { documents } from "../db/schema";
 
-type Env = { Bindings: CloudflareBindings };
+type Env = { Bindings: CloudflareBindings; Variables: { userId: string } };
 
 const app = new Hono<Env>();
+
+app.use("*", withAuth());
 
 const ALLOWED_IMAGE = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const ALLOWED_PDF = "application/pdf";
@@ -20,6 +27,7 @@ type SendBody = {
   // environmentId is part of the FE -> BE contract for future routing; v1 BE
   // does not consume it. Keep accepting it so the FE shape stays stable.
   environmentId: string;
+  documentId: string;
 };
 
 // Build user.message content blocks. SDK v0.91.1 source shapes verified in
@@ -109,6 +117,40 @@ app.post("/sessions/:sessionId/messages", async (c) => {
   if (!body || typeof body.text !== "string" || !Array.isArray(body.attachments)) {
     return c.json({ error: "invalid_body" }, 400);
   }
+  if (!body.documentId || typeof body.documentId !== "string") {
+    return c.json({ error: "missing_document_id" }, 400);
+  }
+
+  const userId = c.get("userId");
+  const db = getDb(c.env.DB);
+
+  // Load the document scoped to this user.
+  const [docRow] = await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.id, body.documentId), eq(documents.userId, userId)))
+    .limit(1);
+  if (!docRow) return c.json({ error: "document_not_found" }, 404);
+
+  // Parse contentJson and convert to Markdown for the agent context.
+  let docMarkdown = "";
+  try {
+    const parsed = JSON.parse(docRow.contentJson) as unknown;
+    docMarkdown = documentJsonToMarkdown(parsed as Parameters<typeof documentJsonToMarkdown>[0]);
+  } catch {
+    // Fall back to empty string — the agent still gets the document header.
+  }
+
+  const docContextBlock = {
+    type: "text" as const,
+    text:
+      `You are editing this document. Each block is preceded by an HTML comment with its id.\n` +
+      `Use the propose_replace_block / propose_insert_block_after / propose_delete_block tools ` +
+      `to make changes; refer to blocks by the ids shown.\n\n` +
+      `--- BEGIN DOCUMENT (id:${docRow.id}, title:${JSON.stringify(docRow.title)}) ---\n` +
+      docMarkdown +
+      `--- END DOCUMENT ---`,
+  };
 
   const client = getClient(c.env);
   const blocks = toContentBlocks(body.text, body.attachments);
@@ -117,7 +159,7 @@ app.post("/sessions/:sessionId/messages", async (c) => {
   // turn's input ready by the time we start reading events.
   try {
     await client.beta.sessions.events.send(sessionId, {
-      events: [{ type: "user.message", content: blocks }],
+      events: [{ type: "user.message", content: [docContextBlock, ...blocks] }],
     });
   } catch (err) {
     return c.json(
@@ -135,6 +177,31 @@ app.post("/sessions/:sessionId/messages", async (c) => {
     async start(controller) {
       try {
         for await (const ev of stream) {
+          // Task 5: Auto-ack propose_* tool calls so the agent keeps streaming.
+          // SDK v0.91.1: the event type is "user.custom_tool_result" with field
+          // "custom_tool_use_id" (verified in events.d.ts).
+          if (
+            ev &&
+            typeof ev === "object" &&
+            (ev as { type?: string }).type === "agent.custom_tool_use" &&
+            typeof (ev as { name?: string }).name === "string" &&
+            isProposeName((ev as { name: string }).name) &&
+            typeof (ev as { id?: string }).id === "string"
+          ) {
+            const customToolUseId = (ev as { id: string }).id;
+            client.beta.sessions.events
+              .send(sessionId, {
+                events: [
+                  {
+                    type: "user.custom_tool_result",
+                    custom_tool_use_id: customToolUseId,
+                    content: [{ type: "text", text: "ok" }],
+                  },
+                ],
+              })
+              .catch(() => undefined);
+          }
+
           for (const wire of translate(ev)) {
             controller.enqueue(encodeSSE(wire));
             if (wire.type === "message_end") {
