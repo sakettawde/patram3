@@ -7,6 +7,7 @@ import { useDocuments } from "#/stores/documents";
 import { useAssistant } from "#/stores/assistant";
 import { uiStore } from "#/stores/ui";
 import { proposalsStore, useProposals, type Proposal } from "#/stores/proposals";
+import { pushProposalsToView } from "#/components/editor/proposal-decorations";
 import { markdownToHtml } from "#/lib/markdown-to-html";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { Editor as TiptapEditor } from "@tiptap/react";
@@ -87,24 +88,49 @@ export function DocSurface() {
     editorRef.current = ed;
   }, []);
 
+  // Push the current store proposals into the editor's plugin state so the
+  // overlay updates in the same tick the store mutates. The Editor's own
+  // useEffect also pushes — but that only fires after React commits a
+  // re-render, which is one tick later. Without this synchronous push, the
+  // overlay can linger briefly (or, if a stale plugin state's decorations
+  // get re-resolved against the post-apply doc and find a still-matching
+  // block, longer than briefly).
+  const syncProposalsToView = useCallback(() => {
+    if (!doc || !editorRef.current) return;
+    const next = (proposalsStore.getState().byDoc[doc.id] ?? []).map((q) => ({
+      id: q.id,
+      kind: q.kind,
+      blockId: q.blockId,
+      afterBlockId: q.afterBlockId,
+      content: q.content,
+    }));
+    pushProposalsToView(editorRef.current.view, next, {
+      onAccept: (id) => acceptProposalRef.current(id),
+      onReject: (id) => rejectProposalRef.current(id),
+      renderContent: (md) => markdownToHtml(md),
+    });
+  }, [doc]);
+
   const acceptProposal = useCallback(
     (proposalId: string) => {
       if (!doc) return;
       const list = proposalsStore.getState().byDoc[doc.id] ?? [];
       const p = list.find((x) => x.id === proposalId);
       if (!p) return;
-      applyProposalToEditor(p, editorRef.current);
       proposalsStore.getState().removeProposal(doc.id, proposalId);
+      applyProposalToEditor(p, editorRef.current);
+      syncProposalsToView();
     },
-    [doc],
+    [doc, syncProposalsToView],
   );
 
   const rejectProposal = useCallback(
     (proposalId: string) => {
       if (!doc) return;
       proposalsStore.getState().removeProposal(doc.id, proposalId);
+      syncProposalsToView();
     },
-    [doc],
+    [doc, syncProposalsToView],
   );
 
   const acceptAll = useCallback(() => {
@@ -117,14 +143,27 @@ export function DocSurface() {
     // also avoids pathological cases — e.g. a replace whose new content
     // includes a block whose id collides with a later proposal target.)
     list.sort((a, b) => orderInDoc(b, a, editorRef.current));
-    for (const p of list) applyProposalToEditor(p, editorRef.current);
     proposalsStore.getState().clearProposals(doc.id);
-  }, [doc]);
+    for (const p of list) applyProposalToEditor(p, editorRef.current);
+    syncProposalsToView();
+  }, [doc, syncProposalsToView]);
 
   const rejectAll = useCallback(() => {
     if (!doc) return;
     proposalsStore.getState().clearProposals(doc.id);
-  }, [doc]);
+    syncProposalsToView();
+  }, [doc, syncProposalsToView]);
+
+  // Refs so syncProposalsToView's callbacks always read the current handlers
+  // without making the plugin re-register on every render.
+  const acceptProposalRef = useRef(acceptProposal);
+  const rejectProposalRef = useRef(rejectProposal);
+  useEffect(() => {
+    acceptProposalRef.current = acceptProposal;
+  }, [acceptProposal]);
+  useEffect(() => {
+    rejectProposalRef.current = rejectProposal;
+  }, [rejectProposal]);
 
   const proposalCallbacks = useMemo(
     () => ({
