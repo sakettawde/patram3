@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSkillsRouteImport } from './routes/_app/skills'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -27,27 +28,35 @@ const AppSkillsRoute = AppSkillsRouteImport.update({
   path: '/skills',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/settings': typeof AppSettingsRoute
   '/skills': typeof AppSkillsRoute
 }
 export interface FileRoutesByTo {
+  '/settings': typeof AppSettingsRoute
   '/skills': typeof AppSkillsRoute
   '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/_app/settings': typeof AppSettingsRoute
   '/_app/skills': typeof AppSkillsRoute
   '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/skills'
+  fullPaths: '/' | '/settings' | '/skills'
   fileRoutesByTo: FileRoutesByTo
-  to: '/skills' | '/'
-  id: '__root__' | '/_app' | '/_app/skills' | '/_app/'
+  to: '/settings' | '/skills' | '/'
+  id: '__root__' | '/_app' | '/_app/settings' | '/_app/skills' | '/_app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,15 +86,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSkillsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppSettingsRoute: typeof AppSettingsRoute
   AppSkillsRoute: typeof AppSkillsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppSettingsRoute: AppSettingsRoute,
   AppSkillsRoute: AppSkillsRoute,
   AppIndexRoute: AppIndexRoute,
 }
