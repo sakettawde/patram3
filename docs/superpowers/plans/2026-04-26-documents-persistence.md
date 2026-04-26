@@ -62,29 +62,20 @@
 
 ---
 
-## Task 1: BE — install test harness deps and add `vitest.config.ts`
+## BE test strategy (post-pivot)
+
+The original plan called for `@cloudflare/vitest-pool-workers` so route tests could hit a real (miniflare-emulated) D1. **This does not work with this project.** The pool peer-deps `vitest@^4.1.0`, but the project's `vite-plus` toolchain aliases `vitest` → `@voidzero-dev/vite-plus-test@0.1.x` (per `pnpm-workspace.yaml`). The pool's prebuilt worker bundle imports `vitest/worker` at runtime inside the miniflare VM and fails. Project rules (CLAUDE.md) forbid installing real vitest directly.
+
+**Revised strategy:** plain vitest (via vite-plus). Pure unit tests run normally. **D1-backed route/middleware integration tests are deferred to Task 17 manual verification** — they are the only thing the dropped pool would have supported, and the existing `apps/fe` test suite plus the manual checks cover the same surface. Tasks 4–8 below have their automated-test steps removed; the implementations themselves are unchanged.
+
+## Task 1: BE — set up the vitest harness
 
 **Files:**
 
 - Modify: `apps/be/package.json`
 - Create: `apps/be/vitest.config.ts`
 
-- [ ] **Step 1: Use ctx7 to confirm current `@cloudflare/vitest-pool-workers` API.**
-
-```bash
-npx ctx7@latest library vitest-pool-workers "configure vitest pool for cloudflare workers with d1"
-# Pick the Cloudflare workers-sdk match (likely /cloudflare/workers-sdk).
-npx ctx7@latest docs <id> "vitest pool workers d1 setup"
-```
-
-- [ ] **Step 2: Install devDeps in `apps/be`.**
-
-```bash
-cd apps/be
-vp add -D @cloudflare/vitest-pool-workers
-```
-
-- [ ] **Step 3: Add `test` script to `apps/be/package.json`.**
+- [ ] **Step 1: Add `test` script to `apps/be/package.json`.**
 
 Add to `"scripts"`:
 
@@ -92,29 +83,29 @@ Add to `"scripts"`:
 "test": "vp test run --passWithNoTests"
 ```
 
-(`--passWithNoTests` is required so the script exits 0 when no test files exist yet — needed only for this initial commit; it is harmless once tests land.)
+(`--passWithNoTests` is required so the script exits 0 when no test files exist yet.)
 
-- [ ] **Step 4: Create `apps/be/vitest.config.ts`.**
+- [ ] **Step 2: Install `vite-plus` as a devDep in `apps/be`** (needed for `defineConfig`):
+
+```bash
+cd apps/be
+vp add -D vite-plus
+```
+
+- [ ] **Step 3: Create `apps/be/vitest.config.ts`.**
 
 ```ts
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vite-plus";
 
+// BE tests run in plain Node. D1-backed integration tests are deferred.
 export default defineConfig({
-  plugins: [
-    cloudflareTest({
-      wrangler: { configPath: "./wrangler.jsonc" },
-      miniflare: {
-        d1Databases: ["DB"],
-      },
-    }),
-  ],
+  test: {
+    environment: "node",
+  },
 });
 ```
 
-(The `@cloudflare/vitest-pool-workers/config` subpath that older docs reference does not exist in v0.15.0+ — `cloudflareTest` is the current entry point. `defineConfig` comes from `vite-plus` per the project-wide rule in `CLAUDE.md`. `vite-plus` must also be added to `apps/be` devDeps.)
-
-- [ ] **Step 5: Verify `vp run test` runs (no tests yet, must exit 0).**
+- [ ] **Step 4: Verify `vp run test` runs and exits 0.**
 
 ```bash
 cd apps/be && vp run test
@@ -122,14 +113,12 @@ cd apps/be && vp run test
 
 Expected: "No test files found", exit 0.
 
-- [ ] **Step 6: Commit.**
+- [ ] **Step 5: Commit.**
 
 ```bash
-git add apps/be/package.json apps/be/vitest.config.ts apps/be/pnpm-lock.yaml
-git -C apps/be commit -m "chore(be): set up vitest with cloudflare workers pool"
+git add apps/be/package.json apps/be/vitest.config.ts pnpm-workspace.yaml pnpm-lock.yaml
+git commit -m "chore(be): set up plain vitest harness"
 ```
-
-(If the lockfile lives at the repo root, add it from there instead.)
 
 ---
 

@@ -5,7 +5,6 @@ packages:
 
 catalog:
   "@anthropic-ai/sdk": ^0.91.1
-  "@cloudflare/vitest-pool-workers": ^0.15.0
   "@cloudflare/workers-types": ^4.20260425.1
   "@floating-ui/dom": ^1.7.6
   "@testing-library/user-event": ^14.6.1
