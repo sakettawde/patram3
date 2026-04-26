@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { assistantStore } from "#/stores/assistant";
 import { AssistantPanel } from "./assistant-panel";
@@ -95,5 +96,49 @@ describe("<AssistantPanel />", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     const sid = assistantStore.getState().selectedSessionId!;
     expect(assistantStore.getState().sessions[sid]!.title).toBe("Renamed");
+  });
+
+  test("renders streaming bubble with text and activity strip", async () => {
+    const api = await import("#/lib/assistant-api");
+    (api.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (_sid: string, _body: unknown, opts: { onEvent: (e: unknown) => void }) => {
+        opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
+        opts.onEvent({ type: "activity", kind: "thinking", label: "Thinking…" });
+        opts.onEvent({ type: "text_delta", delta: "ok" });
+        // hold without ending
+        await new Promise(() => {});
+      },
+    );
+    render(<AssistantPanel />);
+    await userEvent.type(screen.getByLabelText("Message"), "hi{Enter}");
+    await waitFor(() => expect(screen.getByText("ok")).toBeTruthy());
+    expect(screen.getByText("Thinking…")).toBeTruthy();
+  });
+
+  test("stop button replaces send while streaming", async () => {
+    const api = await import("#/lib/assistant-api");
+    (api.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async (
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },
+      ) => {
+        opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
+        opts.onEvent({ type: "text_delta", delta: "partial" });
+        await new Promise<void>((resolve) =>
+          opts.signal?.addEventListener("abort", () => resolve()),
+        );
+      },
+    );
+    render(<AssistantPanel />);
+    await userEvent.type(screen.getByLabelText("Message"), "hi{Enter}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /stop response/i })).toBeTruthy(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /stop response/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /stop response/i })).toBeNull(),
+    );
+    expect(screen.getByText("partial")).toBeTruthy();
   });
 });

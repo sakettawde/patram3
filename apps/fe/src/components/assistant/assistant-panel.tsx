@@ -10,9 +10,6 @@ export function AssistantPanel() {
   const session = useAssistant((s) =>
     s.selectedSessionId ? s.sessions[s.selectedSessionId] : null,
   );
-  const pending = useAssistant((s) =>
-    s.selectedSessionId ? Boolean(s.pendingSessionIds[s.selectedSessionId]) : false,
-  );
   const sendMessage = useAssistant((s) => s.sendMessage);
   const cancelStreaming = useAssistant((s) => s.cancelStreaming);
   const streaming = useAssistant((s) => s.streaming);
@@ -37,7 +34,7 @@ export function AssistantPanel() {
         title={session.title}
         onClose={() => assistantStore.getState().setOpen(false)}
       />
-      <MessageList sessionId={sessionId} messages={session.messages} pending={pending} />
+      <MessageList session={session} />
       <Composer
         disabled={!sessionId}
         streaming={isStreaming}

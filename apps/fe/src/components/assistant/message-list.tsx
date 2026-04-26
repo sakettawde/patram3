@@ -1,55 +1,56 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage } from "#/stores/assistant";
+import { type ChatSession, useAssistant } from "#/stores/assistant";
+import { ActivityStrip } from "./activity-strip";
+import { Markdown } from "./markdown";
 import { MessageBubble } from "./message-bubble";
 
-export function MessageList({
-  sessionId,
-  messages,
-  pending,
-}: {
-  sessionId: string;
-  messages: ChatMessage[];
-  pending: boolean;
-}) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+export function MessageList({ session }: { session: ChatSession }) {
+  const streaming = useAssistant((s) => s.streaming);
+  const retry = useAssistant((s) => s.retryLastTurn);
+  const ref = useRef<HTMLDivElement | null>(null);
 
-  // auto-scroll on new messages, on pending change, and on session switch
+  const isStreamingHere = streaming?.sessionId === session.id;
+
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = ref.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages.length, pending, sessionId]);
+  }, [
+    session.messages.length,
+    isStreamingHere ? streaming?.text : "",
+    isStreamingHere ? streaming?.activity.length : 0,
+  ]);
 
-  if (messages.length === 0 && !pending) {
+  if (session.messages.length === 0 && !isStreamingHere) {
     return (
-      <div
-        ref={scrollRef}
-        className="flex flex-1 items-center justify-center text-[13px] text-(--ink-faint)"
-      >
+      <div className="flex h-full items-center justify-center text-[13px] text-(--ink-faint)">
         Start a conversation
       </div>
     );
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-      {messages.map((m) => (
-        <MessageBubble key={m.id} role={m.role} content={m.content} />
+    <div ref={ref} className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-3">
+      {session.messages.map((m) => (
+        <MessageBubble key={m.id} message={m} />
       ))}
-      {pending && (
-        <div className="flex w-full justify-start" aria-label="Assistant is typing">
-          <div className="rounded-md px-3 py-2 text-[13px] text-(--ink-faint)">
-            <span className="inline-flex gap-1">
-              <span className="size-1 animate-pulse rounded-full bg-current" />
-              <span
-                className="size-1 animate-pulse rounded-full bg-current"
-                style={{ animationDelay: "120ms" }}
-              />
-              <span
-                className="size-1 animate-pulse rounded-full bg-current"
-                style={{ animationDelay: "240ms" }}
-              />
-            </span>
+      {isStreamingHere && (
+        <div className="flex w-full justify-start">
+          <div className="max-w-[88%] text-[13px] leading-relaxed text-(--ink)">
+            <ActivityStrip items={streaming!.activity} />
+            <Markdown source={streaming!.text} />
+            {streaming!.status === "error" && (
+              <div className="mt-1 flex items-center gap-2 text-[12px] text-(--ink-faint)">
+                <span>(reply was interrupted)</span>
+                <button
+                  type="button"
+                  className="rounded border border-(--rule) px-2 py-0.5 hover:bg-(--paper-soft)"
+                  onClick={() => void retry()}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
