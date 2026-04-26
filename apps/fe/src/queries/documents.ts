@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { documentsApi, type DocPatch, type DocumentRow } from "#/lib/documents-api";
 
 const SAVE_DEBOUNCE_MS = 2000;
@@ -128,5 +128,13 @@ export function useUpdateDoc(userId: string | null, docId: string | null) {
     return () => subscribers.current.delete(cb);
   }, []);
 
-  return { schedule, flush, getState: () => stateRef.current, subscribe };
+  const getState = useCallback(() => stateRef.current, []);
+
+  // Memoize the returned object so consumers can safely use `[updater]` as
+  // an effect dep without re-firing every render. The functions inside are
+  // already stable useCallbacks; we just preserve identity at this layer too.
+  return useMemo(
+    () => ({ schedule, flush, getState, subscribe }),
+    [schedule, flush, getState, subscribe],
+  );
 }

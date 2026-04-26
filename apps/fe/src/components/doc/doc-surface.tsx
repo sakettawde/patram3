@@ -38,16 +38,23 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
   }, [saveState, onSavingChange]);
 
   // Flush on tab close / route change.
+  // Depend on `updater.flush` (a stable useCallback result), NOT `updater`.
+  // `useUpdateDoc` returns a fresh object literal every render, so `[updater]`
+  // would re-fire this effect's cleanup on every keystroke (because schedule()
+  // calls setState("saving"), which re-renders), and the cleanup's flush()
+  // would clear the just-set 2 s timer and send immediately — defeating the
+  // debounce.
+  const flush = updater.flush;
   useEffect(() => {
     const onBeforeUnload = () => {
-      void updater.flush();
+      void flush();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      void updater.flush();
+      void flush();
     };
-  }, [updater]);
+  }, [flush]);
 
   // Track the last sent title heading to avoid scheduling no-op patches.
   const [lastSent, setLastSent] = useState<{ titleHeading: string }>({ titleHeading: "" });
