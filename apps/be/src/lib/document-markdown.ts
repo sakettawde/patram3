@@ -61,9 +61,9 @@ function renderBlock(node: JSONNode): string {
 }
 
 function extractListItemPara(li: JSONNode): JSONNode["content"] {
-  // listItem usually wraps a paragraph; pull its inline content out.
-  const para = (li.content ?? []).find((c) => c.type === "paragraph" || c.type === "taskList");
-  return para?.content ?? li.content;
+  // listItem wraps a paragraph; pull its inline content out. Nested lists or
+  // other block children are silently dropped — v1 doesn't render them.
+  return (li.content ?? []).find((c) => c.type === "paragraph")?.content ?? [];
 }
 
 function renderInline(nodes: JSONNode["content"]): string {
