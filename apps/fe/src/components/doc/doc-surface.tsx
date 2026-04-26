@@ -113,22 +113,46 @@ export function DocSurface() {
 
   const acceptProposal = useCallback(
     (proposalId: string) => {
-      if (!doc) return;
+      console.log("[save-debug] acceptProposal clicked", { proposalId });
+      if (!doc) {
+        console.log("[save-debug] acceptProposal early-return: no doc");
+        return;
+      }
       const list = proposalsStore.getState().byDoc[doc.id] ?? [];
       const p = list.find((x) => x.id === proposalId);
-      if (!p) return;
+      console.log("[save-debug] acceptProposal: lookup", {
+        listLen: list.length,
+        listIds: list.map((x) => x.id),
+        found: !!p,
+        kind: p?.kind,
+        editorRef: !!editorRef.current,
+        editorIsDestroyed: editorRef.current?.isDestroyed,
+      });
+      if (!p) {
+        console.log("[save-debug] acceptProposal early-return: proposal not in store");
+        return;
+      }
       proposalsStore.getState().removeProposal(doc.id, proposalId);
-      applyProposalToEditor(p, editorRef.current);
+      try {
+        applyProposalToEditor(p, editorRef.current);
+      } catch (err) {
+        console.error("[save-debug] applyProposalToEditor THREW", err);
+        throw err;
+      }
+      console.log("[save-debug] acceptProposal: applyProposalToEditor returned");
       syncProposalsToView();
+      console.log("[save-debug] acceptProposal: syncProposalsToView returned");
     },
     [doc, syncProposalsToView],
   );
 
   const rejectProposal = useCallback(
     (proposalId: string) => {
+      console.log("[save-debug] rejectProposal clicked", { proposalId });
       if (!doc) return;
       proposalsStore.getState().removeProposal(doc.id, proposalId);
       syncProposalsToView();
+      console.log("[save-debug] rejectProposal: syncProposalsToView returned");
     },
     [doc, syncProposalsToView],
   );
@@ -194,6 +218,10 @@ export function DocSurface() {
         patch.title = title;
         setLastSent({ titleHeading: title });
       }
+      console.log("[save-debug] handleEditorChange → schedule", {
+        userId: user.id,
+        docId: doc?.id ?? null,
+      });
       updater.schedule(patch);
 
       // Auto-reject proposals whose target block disappeared (user edited it
@@ -208,6 +236,11 @@ export function DocSurface() {
       for (const p of currentList) {
         if (p.kind === "insert_after") continue;
         if (!blockIds.has(p.blockId)) {
+          console.log("[save-debug] auto-reject removing proposal", {
+            pId: p.id,
+            kind: p.kind,
+            blockId: p.blockId,
+          });
           proposalsStore.getState().removeProposal(doc.id, p.id);
         }
       }
@@ -250,32 +283,38 @@ export function DocSurface() {
 // ---- helpers ----
 
 function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
+  console.log("[save-debug] applyProposalToEditor: enter", {
+    kind: p.kind,
+    pId: p.id,
+    hasEditor: !!editor,
+    isDestroyed: editor?.isDestroyed,
+  });
   if (!editor) return;
   const view = editor.view;
 
   if (p.kind === "delete") {
     const target = findBlockPos(view.state.doc, p.blockId);
-    if (!target) return;
-    // deleteRange goes through Tiptap's command pipeline so list/quote parents
-    // are joined cleanly instead of leaving an empty wrapper.
+    if (!target) {
+      console.log("[save-debug] applyProposalToEditor: delete target not found");
+      return;
+    }
+    console.log("[save-debug] applyProposalToEditor: about to chain.deleteRange.run");
     editor
       .chain()
       .focus()
       .deleteRange({ from: target.pos, to: target.pos + target.size })
       .run();
+    console.log("[save-debug] applyProposalToEditor: delete chain returned");
     return;
   }
 
   if (p.kind === "replace") {
     const target = findBlockPos(view.state.doc, p.blockId);
-    if (!target) return;
-    // insertContentAt with a {from,to} range deletes the range first and then
-    // inserts the parsed HTML as proper block content. Doing this through
-    // Tiptap (instead of view.dispatch(tr.replace(..., parseSlice(...))))
-    // matters because parseSlice can produce open-boundary slices for inline-
-    // only HTML, which leaves the original block in place and appends the
-    // new content elsewhere — exactly the "added at the bottom, original
-    // didn't disappear" symptom.
+    if (!target) {
+      console.log("[save-debug] applyProposalToEditor: replace target not found");
+      return;
+    }
+    console.log("[save-debug] applyProposalToEditor: about to chain.insertContentAt(replace).run");
     editor
       .chain()
       .focus()
@@ -284,6 +323,7 @@ function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
         markdownToHtml(p.content ?? ""),
       )
       .run();
+    console.log("[save-debug] applyProposalToEditor: replace chain returned");
     return;
   }
 
@@ -295,12 +335,21 @@ function applyProposalToEditor(p: Proposal, editor: TiptapEditor | null): void {
             const t = findBlockPos(view.state.doc, p.afterBlockId ?? "");
             return t ? t.pos + t.size : null;
           })();
-    if (insertPos === null) return;
+    if (insertPos === null) {
+      console.log("[save-debug] applyProposalToEditor: insert_after target not found", {
+        afterBlockId: p.afterBlockId,
+      });
+      return;
+    }
+    console.log("[save-debug] applyProposalToEditor: about to chain.insertContentAt(insert).run", {
+      insertPos,
+    });
     editor
       .chain()
       .focus()
       .insertContentAt(insertPos, markdownToHtml(p.content ?? ""))
       .run();
+    console.log("[save-debug] applyProposalToEditor: insert_after chain returned");
   }
 }
 

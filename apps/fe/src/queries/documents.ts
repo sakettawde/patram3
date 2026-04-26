@@ -68,6 +68,11 @@ export function useUpdateDoc(userId: string | null, docId: string | null) {
   };
 
   const send = useCallback(async () => {
+    console.log("[save-debug] send entered", {
+      userId,
+      docId,
+      pending: pending.current,
+    });
     if (!userId || !docId) return;
     if (Object.keys(pending.current).length === 0) return;
     const patch = pending.current;
@@ -75,10 +80,17 @@ export function useUpdateDoc(userId: string | null, docId: string | null) {
     inflight.current += 1;
     setState("saving");
     try {
-      const row = await documentsApi.update(userId, docId, patch);
-      qc.setQueryData<DocumentRow[]>(docsKey(userId), (prev) =>
-        (prev ?? []).map((d) => (d.id === row.id ? row : d)),
-      );
+      console.log("[save-debug] about to fetch", { userId, docId, patch });
+      try {
+        const row = await documentsApi.update(userId, docId, patch);
+        console.log("[save-debug] fetch succeeded", { rowId: row.id });
+        qc.setQueryData<DocumentRow[]>(docsKey(userId), (prev) =>
+          (prev ?? []).map((d) => (d.id === row.id ? row : d)),
+        );
+      } catch (err) {
+        console.error("[save-debug] send caught error", err);
+        throw err;
+      }
     } finally {
       inflight.current -= 1;
       const stillBusy = timer.current !== null || inflight.current > 0;
@@ -88,11 +100,17 @@ export function useUpdateDoc(userId: string | null, docId: string | null) {
 
   const schedule = useCallback(
     (patch: DocPatch) => {
+      console.log("[save-debug] schedule called", {
+        userId,
+        docId,
+        patchKeys: Object.keys(patch),
+      });
       if (!userId || !docId) return;
       pending.current = { ...pending.current, ...patch };
       setState("saving");
       if (timer.current) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {
+        console.log("[save-debug] 2s timer fired, calling send");
         timer.current = null;
         void send();
       }, SAVE_DEBOUNCE_MS);

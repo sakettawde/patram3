@@ -85,6 +85,7 @@ export function Editor({
         },
       },
       onUpdate: ({ editor: ed }) => {
+        console.log("[save-debug] tiptap onUpdate fired");
         const json = ed.getJSON();
         const title = extractTitle(json);
         const storage = ed.storage as unknown as Record<
@@ -101,9 +102,13 @@ export function Editor({
   // Register the proposals plugin once on mount.
   useEffect(() => {
     if (!editor) return;
+    console.log("[save-debug] Editor: registerPlugin + onReady", {
+      editorId: (editor as unknown as { id?: string }).id,
+    });
     editor.registerPlugin(proposalsPlugin);
     onReady?.(editor);
     return () => {
+      console.log("[save-debug] Editor: unregisterPlugin (cleanup) — editor going away?");
       editor.unregisterPlugin(proposalPluginKey);
     };
   }, [editor, proposalsPlugin, onReady]);

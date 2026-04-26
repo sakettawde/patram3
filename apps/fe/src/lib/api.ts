@@ -17,11 +17,20 @@ async function request<T>(method: string, path: string, body?: unknown, init?: I
     "Content-Type": "application/json",
     ...init?.headers,
   };
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const url = `${BASE_URL}${path}`;
+  console.log("[save-debug] api.request →", { method, url, BASE_URL });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    console.error("[save-debug] fetch threw", err);
+    throw err;
+  }
+  console.log("[save-debug] fetch resolved", { status: res.status, ok: res.ok });
 
   const text = await res.text();
   const parsed = text ? safeParse(text) : undefined;
