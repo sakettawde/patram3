@@ -304,4 +304,28 @@ app.post("/sessions/:sessionId/messages", async (c) => {
   });
 });
 
+// SDK v0.91.1 investigation result:
+//   client.beta.sessions        → create / retrieve / update / list / delete / archive
+//   client.beta.sessions.events → list / send / stream
+// There is NO cancel(), stop(), or abort() method on either resource.
+// The closest approximation is sending a user.interrupt event, which pauses the
+// running agent turn. We fire it best-effort; the FE-side AbortController close
+// is the actual stream cancel. This route exists for forward-compatibility and
+// to stop unnecessary compute when the FE disconnects.
+app.post("/sessions/:sessionId/cancel", async (c) => {
+  const sessionId = c.req.param("sessionId");
+  const client = getClient(c.env);
+  try {
+    // Best-effort: send a user.interrupt event to stop the running agent turn.
+    // SDK v0.91.1 has no dedicated cancel method; user.interrupt is the closest
+    // available signal (pauses agent execution and returns session to idle).
+    await client.beta.sessions.events.send(sessionId, {
+      events: [{ type: "user.interrupt" }],
+    });
+  } catch {
+    // Best-effort — don't surface errors to the FE.
+  }
+  return c.json({ ok: true });
+});
+
 export default app;
