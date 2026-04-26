@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { useStore } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { pickReply } from "#/lib/mock-replies";
+import * as api from "#/lib/assistant-api";
 
 export type ChatRole = "user" | "assistant";
 
@@ -61,13 +61,15 @@ export type AssistantActions = {
   selectSession: (id: string) => void;
   renameSession: (id: string, title: string) => void;
   deleteSession: (id: string) => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, attachments?: AttachmentMeta[]) => Promise<void>;
+  cancelStreaming: () => void;
+  retryLastTurn: () => Promise<void>;
 };
 
 export type AssistantStore = AssistantState & AssistantActions;
 
-const REPLY_DELAY_MIN = 600;
-const REPLY_DELAY_MAX = 1100;
+// Per-session AbortControllers for in-flight stream requests.
+const streamControllers = new Map<string, AbortController>();
 
 function newSession(): ChatSession {
   const now = Date.now();
@@ -86,6 +88,31 @@ function truncateForTitle(content: string, max = 60): string {
   const trimmed = content.trim();
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max).trimEnd()}…`;
+}
+
+// Structural shape used at the boundary; composer may pass a `content`
+// field on text-kind attachments which is not part of AttachmentMeta.
+type IncomingAttachment =
+  | { kind: "image" | "pdf"; fileId: string; name: string; size: number }
+  | { kind: "text"; name: string; size: number; content?: string };
+
+function toApiAttachments(items: IncomingAttachment[]): api.Attachment[] {
+  return items.map((a) => {
+    if (a.kind === "text") {
+      const content = (a as { content?: string }).content ?? "";
+      return { kind: "text", name: a.name, content };
+    }
+    return { kind: a.kind, fileId: a.fileId, name: a.name, size: a.size };
+  });
+}
+
+function toStoredAttachments(items: IncomingAttachment[]): AttachmentMeta[] {
+  return items.map((a) => {
+    if (a.kind === "text") {
+      return { kind: "text", name: a.name, size: a.size };
+    }
+    return { kind: a.kind, fileId: a.fileId, name: a.name, size: a.size };
+  });
 }
 
 export function createAssistantStore(): StoreApi<AssistantStore> {
@@ -137,6 +164,11 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
         },
 
         deleteSession: (id) => {
+          const ac = streamControllers.get(id);
+          if (ac) {
+            ac.abort();
+            streamControllers.delete(id);
+          }
           set((st) => {
             if (!st.sessions[id]) return st;
             const nextSessions = { ...st.sessions };
@@ -152,16 +184,18 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
                     (a, b) => (nextSessions[b]?.updatedAt ?? 0) - (nextSessions[a]?.updatedAt ?? 0),
                   )[0] ?? null)
               : st.selectedSessionId;
+            const nextStreaming = st.streaming?.sessionId === id ? null : st.streaming;
             return {
               sessions: nextSessions,
               order: nextOrder,
               selectedSessionId: nextSelected,
               pendingSessionIds: nextPending,
+              streaming: nextStreaming,
             };
           });
         },
 
-        sendMessage: (content) => {
+        sendMessage: async (content, attachments) => {
           const trimmed = content.trim();
           if (trimmed === "") return;
           const sid = get().selectedSessionId;
@@ -169,11 +203,54 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           const session = get().sessions[sid];
           if (!session) return;
 
+          const incoming = (attachments ?? []) as IncomingAttachment[];
+
+          // 1) Lazy bootstrap the Anthropic session.
+          let anthropicSessionId = session.anthropicSessionId;
+          let environmentId = session.environmentId;
+          if (!anthropicSessionId || !environmentId) {
+            try {
+              const created = await api.createSession();
+              anthropicSessionId = created.sessionId;
+              environmentId = created.environmentId;
+              set((st) => {
+                const existing = st.sessions[sid];
+                if (!existing) return st;
+                return {
+                  sessions: {
+                    ...st.sessions,
+                    [sid]: {
+                      ...existing,
+                      anthropicSessionId,
+                      environmentId,
+                    },
+                  },
+                };
+              });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              set({
+                streaming: {
+                  sessionId: sid,
+                  messageId: "",
+                  text: "",
+                  activity: [],
+                  status: "error",
+                  errorMessage: msg,
+                },
+              });
+              return;
+            }
+          }
+
+          // 2) Optimistically append the user message.
+          const storedAttachments = toStoredAttachments(incoming);
           const userMsg: ChatMessage = {
             id: nanoid(8),
             role: "user",
             content: trimmed,
             createdAt: Date.now(),
+            ...(storedAttachments.length > 0 ? { attachments: storedAttachments } : {}),
           };
 
           const isFirstUserMessage = session.messages.length === 0;
@@ -192,48 +269,191 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
                 },
               },
               pendingSessionIds: { ...st.pendingSessionIds, [sid]: true },
+              // 3) Initialize the streaming slot.
+              streaming: {
+                sessionId: sid,
+                messageId: "",
+                text: "",
+                activity: [],
+                status: "streaming",
+              },
             };
           });
 
-          const delay =
-            REPLY_DELAY_MIN + Math.floor(Math.random() * (REPLY_DELAY_MAX - REPLY_DELAY_MIN));
+          // Set up AbortController for this stream.
+          const ac = new AbortController();
+          streamControllers.set(sid, ac);
 
-          window.setTimeout(() => {
-            const cur = get().sessions[sid];
-            if (!cur) {
-              set((st) => {
-                if (!st.pendingSessionIds[sid]) return st;
-                const nextPending = { ...st.pendingSessionIds };
-                delete nextPending[sid];
-                return { pendingSessionIds: nextPending };
-              });
-              return;
-            }
-            const userCount = cur.messages.filter((m) => m.role === "user").length;
-            const reply: ChatMessage = {
-              id: nanoid(8),
-              role: "assistant",
-              content: pickReply(userCount - 1),
-              createdAt: Date.now(),
+          try {
+            const apiAttachments = toApiAttachments(incoming);
+            const body: api.SendBody = {
+              text: trimmed,
+              attachments: apiAttachments,
+              environmentId: environmentId!,
             };
+
+            await api.streamMessage(anthropicSessionId!, body, {
+              signal: ac.signal,
+              onEvent: (e) => {
+                if (e.type === "message_start") {
+                  set((st) => {
+                    if (!st.streaming || st.streaming.sessionId !== sid) return st;
+                    return {
+                      streaming: { ...st.streaming, messageId: e.id },
+                    };
+                  });
+                } else if (e.type === "text_delta") {
+                  set((st) => {
+                    if (!st.streaming || st.streaming.sessionId !== sid) return st;
+                    return {
+                      streaming: {
+                        ...st.streaming,
+                        text: st.streaming.text + e.delta,
+                      },
+                    };
+                  });
+                } else if (e.type === "activity") {
+                  set((st) => {
+                    if (!st.streaming || st.streaming.sessionId !== sid) return st;
+                    const entry: StreamingActivity = {
+                      id: nanoid(8),
+                      kind: e.kind,
+                      label: e.label,
+                      summary: e.summary,
+                      at: Date.now(),
+                    };
+                    return {
+                      streaming: {
+                        ...st.streaming,
+                        activity: [...st.streaming.activity, entry],
+                      },
+                    };
+                  });
+                } else if (e.type === "message_end") {
+                  const cur = get();
+                  const slot = cur.streaming;
+                  if (!slot || slot.sessionId !== sid) return;
+                  const msg: ChatMessage = {
+                    id: slot.messageId || nanoid(8),
+                    role: "assistant",
+                    content: slot.text,
+                    createdAt: Date.now(),
+                  };
+                  set((st) => {
+                    const existing = st.sessions[sid];
+                    if (!existing) return st;
+                    const nextPending = { ...st.pendingSessionIds };
+                    delete nextPending[sid];
+                    return {
+                      sessions: {
+                        ...st.sessions,
+                        [sid]: {
+                          ...existing,
+                          messages: [...existing.messages, msg],
+                          updatedAt: msg.createdAt,
+                        },
+                      },
+                      pendingSessionIds: nextPending,
+                      streaming: null,
+                    };
+                  });
+                } else if (e.type === "error") {
+                  set((st) => {
+                    if (!st.streaming || st.streaming.sessionId !== sid) return st;
+                    return {
+                      streaming: {
+                        ...st.streaming,
+                        status: "error",
+                        errorMessage: e.message,
+                      },
+                    };
+                  });
+                }
+              },
+            });
+          } catch (err) {
+            const cur = get();
+            const slot = cur.streaming;
+            // If we already marked cancelled, leave the partial message handling
+            // to cancelStreaming. Otherwise, treat this as an error.
+            if (slot && slot.sessionId === sid && slot.status !== "cancelled") {
+              const msg = err instanceof Error ? err.message : String(err);
+              set((st) => {
+                if (!st.streaming || st.streaming.sessionId !== sid) return st;
+                return {
+                  streaming: {
+                    ...st.streaming,
+                    status: "error",
+                    errorMessage: msg,
+                  },
+                };
+              });
+            }
+          } finally {
+            streamControllers.delete(sid);
             set((st) => {
-              const existing = st.sessions[sid];
-              if (!existing) return st;
+              if (!st.pendingSessionIds[sid]) return st;
               const nextPending = { ...st.pendingSessionIds };
               delete nextPending[sid];
-              return {
-                sessions: {
-                  ...st.sessions,
-                  [sid]: {
-                    ...existing,
-                    messages: [...existing.messages, reply],
-                    updatedAt: reply.createdAt,
-                  },
-                },
-                pendingSessionIds: nextPending,
-              };
+              return { pendingSessionIds: nextPending };
             });
-          }, delay);
+          }
+        },
+
+        cancelStreaming: () => {
+          const sid = get().selectedSessionId;
+          if (!sid) return;
+          const slot = get().streaming;
+          if (!slot || slot.sessionId !== sid) return;
+
+          // Commit any partial text as a final assistant message (status cancelled).
+          const partial = slot.text;
+          const messageId = slot.messageId || nanoid(8);
+          set((st) => {
+            const existing = st.sessions[sid];
+            if (!existing) return st;
+            const nextMessages =
+              partial.length > 0
+                ? [
+                    ...existing.messages,
+                    {
+                      id: messageId,
+                      role: "assistant" as const,
+                      content: partial,
+                      createdAt: Date.now(),
+                    },
+                  ]
+                : existing.messages;
+            return {
+              sessions: {
+                ...st.sessions,
+                [sid]: {
+                  ...existing,
+                  messages: nextMessages,
+                  updatedAt: Date.now(),
+                },
+              },
+              streaming: null,
+            };
+          });
+
+          // Abort the in-flight fetch.
+          const ac = streamControllers.get(sid);
+          if (ac) {
+            ac.abort();
+            streamControllers.delete(sid);
+          }
+
+          // Fire-and-forget remote cancel.
+          const session = get().sessions[sid];
+          const asid = session?.anthropicSessionId;
+          if (asid) {
+            void api.cancel(asid);
+          }
+        },
+
+        retryLastTurn: async () => {
+          await get().sendMessage("Please continue.");
         },
       }),
       {
