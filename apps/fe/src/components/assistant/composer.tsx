@@ -8,11 +8,13 @@ import type { DraftAttachment } from "./attachment-chip";
 export function Composer({
   disabled,
   streaming,
+  userId,
   onSend,
   onStop,
 }: {
   disabled: boolean;
   streaming: boolean;
+  userId: string;
   onSend: (text: string, attachments: AttachmentMeta[]) => void;
   onStop: () => void;
 }) {
@@ -89,7 +91,9 @@ export function Composer({
         submit();
       }}
     >
-      {!streaming && <AttachmentRow attachments={attachments} setAttachments={setAttachments} />}
+      {!streaming && (
+        <AttachmentRow attachments={attachments} setAttachments={setAttachments} userId={userId} />
+      )}
       <div className="px-3 pt-2">
         <div className="relative flex items-end gap-2 rounded-md border border-(--rule) bg-(--paper) px-3 py-2 focus-within:border-(--rule-strong)">
           <textarea

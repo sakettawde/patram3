@@ -34,11 +34,13 @@ function classifyFile(file: File): DraftAttachment["kind"] | null {
 export function AttachmentRow({
   attachments,
   setAttachments,
+  userId,
 }: {
   attachments: DraftAttachment[];
   setAttachments: (
     next: DraftAttachment[] | ((prev: DraftAttachment[]) => DraftAttachment[]),
   ) => void;
+  userId: string;
 }) {
   const ref = useRef<HTMLInputElement | null>(null);
 
@@ -86,7 +88,7 @@ export function AttachmentRow({
         }
       } else {
         try {
-          const r = await uploadFile(a.file!);
+          const r = await uploadFile(userId, a.file!);
           setAttachments((prev) =>
             prev.map((p) => (p.id === a.id ? { ...p, fileId: r.fileId, status: "ready" } : p)),
           );

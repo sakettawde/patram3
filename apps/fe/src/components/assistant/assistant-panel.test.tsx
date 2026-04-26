@@ -4,11 +4,44 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { assistantStore } from "#/stores/assistant";
 import { AssistantPanel } from "./assistant-panel";
 
+// localStorage shim: the test environment does not expose a global localStorage.
+if (typeof globalThis.localStorage === "undefined") {
+  const store: Record<string, string> = {};
+  Object.defineProperty(globalThis, "localStorage", {
+    value: {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = v;
+      },
+      removeItem: (k: string) => {
+        delete store[k];
+      },
+      clear: () => {
+        for (const k of Object.keys(store)) delete store[k];
+      },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: (i: number) => Object.keys(store)[i] ?? null,
+    } as Storage,
+    writable: true,
+  });
+}
+
+vi.mock("#/auth/auth-gate", () => ({
+  useUser: () => ({ id: "test-user", name: "Test User" }),
+}));
+
 vi.mock("#/lib/assistant-api", () => ({
   createSession: vi.fn(async () => ({ sessionId: "asid", environmentId: "eid" })),
   uploadFile: vi.fn(),
   streamMessage: vi.fn(
-    async (_sid: string, _body: unknown, opts: { onEvent: (e: unknown) => void }) => {
+    async (
+      _userId: string,
+      _sid: string,
+      _body: unknown,
+      opts: { onEvent: (e: unknown) => void },
+    ) => {
       opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
       opts.onEvent({ type: "text_delta", delta: "ok" });
       opts.onEvent({ type: "message_end" });
@@ -28,21 +61,23 @@ describe("<AssistantPanel />", () => {
       pendingSessionIds: {},
       streaming: null,
     });
+    // Pre-create a session bound to a doc so the panel renders the full UI.
+    assistantStore.getState().selectSessionForDoc("doc-test");
   });
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  test("auto-creates a session on mount when none exists", () => {
+  test("renders empty panel chrome when no session is selected", () => {
+    // Clear the session created in beforeEach.
+    assistantStore.setState({ selectedSessionId: null, sessions: {}, order: [] });
     render(<AssistantPanel />);
-    expect(assistantStore.getState().order.length).toBe(1);
-    screen.getByText("Start a conversation");
+    // Panel renders PanelChrome (no session list, no composer) when selectedSessionId is null.
+    expect(screen.queryByLabelText("Message")).toBeNull();
   });
 
   test("typing + Enter sends a user message and shows the assistant reply", async () => {
     render(<AssistantPanel />);
-    // Wait for the auto-created session to be available in the UI.
-    await waitFor(() => screen.getByLabelText("Message"));
     const ta = screen.getByLabelText("Message") as HTMLTextAreaElement;
     await act(async () => {
       fireEvent.change(ta, { target: { value: "hello" } });
@@ -63,11 +98,11 @@ describe("<AssistantPanel />", () => {
   });
 
   test("Shift+Enter does NOT send", () => {
+    const sid = assistantStore.getState().selectedSessionId!;
     render(<AssistantPanel />);
     const ta = screen.getByLabelText("Message") as HTMLTextAreaElement;
     fireEvent.change(ta, { target: { value: "draft" } });
     fireEvent.keyDown(ta, { key: "Enter", shiftKey: true });
-    const sid = assistantStore.getState().selectedSessionId!;
     expect(assistantStore.getState().sessions[sid]!.messages).toHaveLength(0);
   });
 
@@ -101,7 +136,12 @@ describe("<AssistantPanel />", () => {
   test("renders streaming bubble with text and activity strip", async () => {
     const api = await import("#/lib/assistant-api");
     (api.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      async (_sid: string, _body: unknown, opts: { onEvent: (e: unknown) => void }) => {
+      async (
+        _userId: string,
+        _sid: string,
+        _body: unknown,
+        opts: { onEvent: (e: unknown) => void },
+      ) => {
         opts.onEvent({ type: "message_start", id: "m1", createdAt: 1 });
         opts.onEvent({ type: "activity", kind: "thinking", label: "Thinking…" });
         opts.onEvent({ type: "text_delta", delta: "ok" });
@@ -119,6 +159,7 @@ describe("<AssistantPanel />", () => {
     const api = await import("#/lib/assistant-api");
     (api.streamMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async (
+        _userId: string,
         _sid: string,
         _body: unknown,
         opts: { onEvent: (e: unknown) => void; signal?: AbortSignal },

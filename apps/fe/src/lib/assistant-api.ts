@@ -30,6 +30,15 @@ export type WireEvent =
       label: string;
       summary?: string;
     }
+  | {
+      type: "proposal";
+      id: string;
+      kind: "replace" | "insert_after" | "delete";
+      blockId: string;
+      afterBlockId?: string;
+      content?: string;
+      toolUseId: string;
+    }
   | { type: "message_end"; usage?: { input_tokens: number; output_tokens: number } }
   | { type: "error"; message: string; retryable: boolean };
 
@@ -41,26 +50,34 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function createSession(): Promise<CreateSessionResponse> {
-  const res = await fetch(`${BASE}/sessions`, { method: "POST" });
+export async function createSession(userId: string): Promise<CreateSessionResponse> {
+  const res = await fetch(`${BASE}/sessions`, {
+    method: "POST",
+    headers: { "X-User-Id": userId },
+  });
   return jsonOrThrow(res);
 }
 
-export async function uploadFile(file: File): Promise<UploadFileResponse> {
+export async function uploadFile(userId: string, file: File): Promise<UploadFileResponse> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${BASE}/files`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}/files`, {
+    method: "POST",
+    headers: { "X-User-Id": userId },
+    body: fd,
+  });
   return jsonOrThrow(res);
 }
 
 export async function streamMessage(
+  userId: string,
   sessionId: string,
   body: SendBody,
   opts: { onEvent: (e: WireEvent) => void; signal?: AbortSignal },
 ): Promise<void> {
   const res = await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}/messages`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "X-User-Id": userId },
     body: JSON.stringify(body),
     signal: opts.signal,
   });
@@ -74,8 +91,9 @@ export async function streamMessage(
   });
 }
 
-export async function cancel(sessionId: string): Promise<void> {
+export async function cancel(userId: string, sessionId: string): Promise<void> {
   await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}/cancel`, {
     method: "POST",
+    headers: { "X-User-Id": userId },
   }).catch(() => {});
 }

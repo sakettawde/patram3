@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useUser } from "#/auth/auth-gate";
 import { type ChatSession, useAssistant } from "#/stores/assistant";
 import { ActivityStrip } from "./activity-strip";
 import { Markdown } from "./markdown";
@@ -6,6 +7,7 @@ import { MessageBubble } from "./message-bubble";
 import { ThinkingDots } from "./thinking-dots";
 
 export function MessageList({ session }: { session: ChatSession }) {
+  const user = useUser();
   const streaming = useAssistant((s) => s.streaming);
   const retry = useAssistant((s) => s.retryLastTurn);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -49,7 +51,7 @@ export function MessageList({ session }: { session: ChatSession }) {
                 <button
                   type="button"
                   className="rounded border border-(--rule) px-2 py-0.5 hover:bg-(--paper-soft)"
-                  onClick={() => void retry()}
+                  onClick={() => void retry(user.id)}
                 >
                   Retry
                 </button>

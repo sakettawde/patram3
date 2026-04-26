@@ -1,10 +1,12 @@
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useUser } from "#/auth/auth-gate";
 import { assistantStore, useAssistant } from "#/stores/assistant";
 import { Composer } from "./composer";
 import { MessageList } from "./message-list";
 
 export function AssistantPanel() {
+  const user = useUser();
   const sessionId = useAssistant((s) => s.selectedSessionId);
   const session = useAssistant((s) =>
     s.selectedSessionId ? s.sessions[s.selectedSessionId] : null,
@@ -33,8 +35,9 @@ export function AssistantPanel() {
       <Composer
         disabled={!sessionId}
         streaming={isStreaming}
-        onSend={(text, attachments) => void sendMessage(text, attachments)}
-        onStop={cancelStreaming}
+        userId={user.id}
+        onSend={(text, attachments) => void sendMessage(text, attachments, user.id)}
+        onStop={() => cancelStreaming(user.id)}
       />
     </div>
   );

@@ -13,7 +13,7 @@ function Harness() {
   const [a, setA] = useState<DraftAttachment[]>([]);
   return (
     <div>
-      <AttachmentRow attachments={a} setAttachments={setA} />
+      <AttachmentRow attachments={a} setAttachments={setA} userId="test-user" />
       <div data-testid="count">{a.length}</div>
       <div data-testid="status">{a.map((x) => x.status).join(",")}</div>
     </div>
