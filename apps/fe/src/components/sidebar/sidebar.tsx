@@ -3,6 +3,7 @@ import { cn } from "#/lib/utils";
 import { useUi } from "#/stores/ui";
 import { DocsList } from "./docs-list";
 import { SessionsList } from "./sessions-list";
+import { SidebarHeaderActions } from "./sidebar-header-actions";
 import { SidebarTabs } from "./sidebar-tabs";
 import { ProfileMenu } from "#/components/profile-menu";
 
@@ -34,6 +35,7 @@ export function Sidebar({
               <PanelLeftClose className="size-3.5" />
             </button>
           </div>
+          <SidebarHeaderActions />
           <SidebarTabs />
           {tab === "docs" ? <DocsList /> : <SessionsList />}
           <ProfileMenu />

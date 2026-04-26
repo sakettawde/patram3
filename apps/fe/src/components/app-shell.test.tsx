@@ -134,10 +134,12 @@ describe("<AppShell />", () => {
     localStorage.clear();
   });
 
-  test("mounts with brand, search, and new-doc button", async () => {
+  test("mounts with brand, search, and the two header action buttons", async () => {
     await renderShell();
+    screen.getByText("Patram");
     screen.getByLabelText(/search documents/i);
-    screen.getByRole("button", { name: /new document/i });
+    screen.getByRole("button", { name: "New chat" });
+    screen.getByRole("button", { name: "New document" });
   });
 
   test("shows documents from the server in the sidebar", async () => {
@@ -150,10 +152,14 @@ describe("<AppShell />", () => {
     });
   });
 
-  test("switching to Sessions tab shows the New chat button", async () => {
+  test("New chat and New document buttons are visible regardless of active tab", async () => {
     await renderShell();
+    // Docs tab (default)
+    expect(screen.getByRole("button", { name: "New chat" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New document" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
-    screen.getByRole("button", { name: /new chat/i });
+    expect(screen.getByRole("button", { name: "New chat" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New document" })).toBeTruthy();
   });
 
   test("Topbar assistant toggle opens and closes the panel", async () => {
