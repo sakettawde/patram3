@@ -10,6 +10,7 @@ export type SendBody = {
   text: string;
   attachments: Attachment[];
   environmentId: string;
+  documentId: string; // Task 8: sessions are bound to a document; Task 9 will plumb this into the network request
 };
 
 export type CreateSessionResponse = { sessionId: string; environmentId: string };

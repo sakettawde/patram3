@@ -21,6 +21,7 @@ export type ChatMessage = {
 export type ChatSession = {
   id: string;
   title: string;
+  documentId: string; // required — sessions always belong to a document
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
@@ -57,7 +58,7 @@ export type AssistantState = {
 export type AssistantActions = {
   toggleOpen: () => void;
   setOpen: (open: boolean) => void;
-  createSession: () => string;
+  selectSessionForDoc: (docId: string) => void;
   selectSession: (id: string) => void;
   renameSession: (id: string, title: string) => void;
   deleteSession: (id: string) => void;
@@ -71,11 +72,12 @@ export type AssistantStore = AssistantState & AssistantActions;
 // Per-session AbortControllers for in-flight stream requests.
 const streamControllers = new Map<string, AbortController>();
 
-function newSession(): ChatSession {
+function newSession(documentId: string): ChatSession {
   const now = Date.now();
   return {
     id: nanoid(8),
     title: "New chat",
+    documentId,
     messages: [],
     createdAt: now,
     updatedAt: now,
@@ -129,16 +131,18 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
         toggleOpen: () => set((st) => ({ open: !st.open })),
         setOpen: (open) => set({ open }),
 
-        createSession: () => {
-          const s = newSession();
-          set((st) => ({
-            sessions: { ...st.sessions, [s.id]: s },
-            order: [...st.order, s.id],
-            selectedSessionId: s.id,
-            open: true,
-          }));
-          return s.id;
-        },
+        selectSessionForDoc: (docId: string) =>
+          set((state) => {
+            const existing = state.order.find((id) => state.sessions[id]?.documentId === docId);
+            if (existing) return { selectedSessionId: existing, open: state.open };
+            const session = newSession(docId);
+            return {
+              sessions: { ...state.sessions, [session.id]: session },
+              order: [...state.order, session.id],
+              selectedSessionId: session.id,
+              open: true,
+            };
+          }),
 
         selectSession: (id) => {
           if (!get().sessions[id]) return;
@@ -290,6 +294,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
               text: trimmed,
               attachments: apiAttachments,
               environmentId: environmentId!,
+              documentId: session.documentId,
             };
 
             await api.streamMessage(anthropicSessionId!, body, {
@@ -469,6 +474,18 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
           sessions: s.sessions,
           order: s.order,
         }),
+        onRehydrateStorage: () => (state) => {
+          if (!state) return;
+          const validIds = state.order.filter((id) => {
+            const s = state.sessions[id];
+            return !!s && typeof s.documentId === "string" && s.documentId.length > 0;
+          });
+          state.order = validIds;
+          state.sessions = Object.fromEntries(validIds.map((id) => [id, state.sessions[id]!]));
+          if (state.selectedSessionId && !state.sessions[state.selectedSessionId]) {
+            state.selectedSessionId = null;
+          }
+        },
       },
     ),
   );

@@ -5,7 +5,6 @@ import { Composer } from "./composer";
 import { MessageList } from "./message-list";
 
 export function AssistantPanel() {
-  const open = useAssistant((s) => s.open);
   const sessionId = useAssistant((s) => s.selectedSessionId);
   const session = useAssistant((s) =>
     s.selectedSessionId ? s.sessions[s.selectedSessionId] : null,
@@ -14,12 +13,8 @@ export function AssistantPanel() {
   const cancelStreaming = useAssistant((s) => s.cancelStreaming);
   const streaming = useAssistant((s) => s.streaming);
 
-  // Auto-create a session on first open if none exists.
-  useEffect(() => {
-    if (open && !sessionId) {
-      assistantStore.getState().createSession();
-    }
-  }, [open, sessionId]);
+  // TODO Task 14: sessions are now created via selectSessionForDoc(docId) when a document is opened.
+  // The panel renders PanelChrome (empty) until a doc is selected.
 
   if (!session || !sessionId) {
     return <PanelChrome />;

@@ -46,7 +46,7 @@ describe("assistant-api", () => {
     const events: unknown[] = [];
     await streamMessage(
       "s1",
-      { text: "hi", attachments: [], environmentId: "e1" },
+      { text: "hi", attachments: [], environmentId: "e1", documentId: "doc1" },
       { onEvent: (e) => events.push(e) },
     );
     expect(events).toHaveLength(2);

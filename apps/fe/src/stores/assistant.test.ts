@@ -1,6 +1,31 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { createAssistantStore } from "./assistant";
 
+// localStorage shim: the test environment does not expose a global localStorage.
+// Using a simple in-memory map that mimics the localStorage API.
+if (typeof globalThis.localStorage === "undefined") {
+  const store: Record<string, string> = {};
+  Object.defineProperty(globalThis, "localStorage", {
+    value: {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = v;
+      },
+      removeItem: (k: string) => {
+        delete store[k];
+      },
+      clear: () => {
+        for (const k of Object.keys(store)) delete store[k];
+      },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: (i: number) => Object.keys(store)[i] ?? null,
+    } as Storage,
+    writable: true,
+  });
+}
+
 vi.mock("#/lib/assistant-api", () => {
   return {
     createSession: vi.fn(async () => ({ sessionId: "asid", environmentId: "eid" })),
@@ -64,12 +89,14 @@ describe("AssistantStore", () => {
     expect(s.getState().open).toBe(false);
   });
 
-  test("createSession adds, selects, opens", () => {
+  test("selectSessionForDoc adds, selects, opens", () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     expect(s.getState().sessions[id]).toBeTruthy();
     expect(s.getState().sessions[id]!.title).toBe("New chat");
     expect(s.getState().sessions[id]!.messages).toEqual([]);
+    expect(s.getState().sessions[id]!.documentId).toBe("doc-test");
     expect(s.getState().order).toContain(id);
     expect(s.getState().selectedSessionId).toBe(id);
     expect(s.getState().open).toBe(true);
@@ -77,8 +104,10 @@ describe("AssistantStore", () => {
 
   test("selectSession sets selection and opens panel", () => {
     const s = createAssistantStore();
-    const a = s.getState().createSession();
-    const b = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-a");
+    const a = s.getState().selectedSessionId!;
+    s.getState().selectSessionForDoc("doc-b");
+    const b = s.getState().selectedSessionId!;
     s.getState().setOpen(false);
     s.getState().selectSession(a);
     expect(s.getState().selectedSessionId).toBe(a);
@@ -88,7 +117,8 @@ describe("AssistantStore", () => {
 
   test("renameSession updates title; empty title falls back to 'New chat'", () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     s.getState().renameSession(id, "Plot ideas");
     expect(s.getState().sessions[id]!.title).toBe("Plot ideas");
     s.getState().renameSession(id, "  ");
@@ -97,8 +127,10 @@ describe("AssistantStore", () => {
 
   test("deleteSession removes, advances selection to next-most-recent", () => {
     const s = createAssistantStore();
-    const a = s.getState().createSession();
-    const b = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-a");
+    const a = s.getState().selectedSessionId!;
+    s.getState().selectSessionForDoc("doc-b");
+    const b = s.getState().selectedSessionId!;
     s.getState().deleteSession(b);
     expect(s.getState().sessions[b]).toBeUndefined();
     expect(s.getState().selectedSessionId).toBe(a);
@@ -106,14 +138,16 @@ describe("AssistantStore", () => {
 
   test("deleteSession on last session leaves selectedSessionId null", () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     s.getState().deleteSession(id);
     expect(s.getState().selectedSessionId).toBeNull();
   });
 
   test("sendMessage appends user msg, then assistant reply via stream", async () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("hello");
     const session = s.getState().sessions[id]!;
     expect(session.messages).toHaveLength(2);
@@ -132,14 +166,16 @@ describe("AssistantStore", () => {
 
   test("session title auto-derives from first user message", async () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("Outline my essay on quiet design");
     expect(s.getState().sessions[id]!.title).toBe("Outline my essay on quiet design");
   });
 
   test("session title does not change after second user message", async () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("First");
     await s.getState().sendMessage("Second");
     expect(s.getState().sessions[id]!.title).toBe("First");
@@ -147,7 +183,8 @@ describe("AssistantStore", () => {
 
   test("two sends produce two assistant replies via streaming", async () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("one");
     await s.getState().sendMessage("two");
     const msgs = s.getState().sessions[id]!.messages;
@@ -157,9 +194,11 @@ describe("AssistantStore", () => {
 
   test("reply lands on the original session even after switch", async () => {
     const s = createAssistantStore();
-    const a = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-a");
+    const a = s.getState().selectedSessionId!;
     const sendPromise = s.getState().sendMessage("from a");
-    const b = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-b");
+    const b = s.getState().selectedSessionId!;
     expect(s.getState().selectedSessionId).toBe(b);
     await sendPromise;
     expect(s.getState().sessions[a]!.messages).toHaveLength(2);
@@ -168,7 +207,7 @@ describe("AssistantStore", () => {
 
   test("persists sessions and open state across instances", async () => {
     const a = createAssistantStore();
-    a.getState().createSession();
+    a.getState().selectSessionForDoc("doc-test");
     await a.getState().sendMessage("hi");
     const b = createAssistantStore();
     expect(b.getState().order.length).toBe(1);
@@ -193,7 +232,8 @@ describe("AssistantStore", () => {
       },
     );
     const a = createAssistantStore();
-    const id = a.getState().createSession();
+    a.getState().selectSessionForDoc("doc-test");
+    const id = a.getState().selectedSessionId!;
     const p = a.getState().sendMessage("in flight");
     // Allow microtasks to flush so pending bit is set.
     await new Promise<void>((r) => setTimeout(r, 0));
@@ -207,7 +247,8 @@ describe("AssistantStore", () => {
 
   test("newly created sessions have null anthropicSessionId/environmentId", () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     const sess = s.getState().sessions[id];
     expect(sess?.anthropicSessionId).toBeNull();
     expect(sess?.environmentId).toBeNull();
@@ -215,7 +256,8 @@ describe("AssistantStore", () => {
 
   test("messages may carry attachments metadata", () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     s.setState((st) => {
       const sess = st.sessions[id]!;
       return {
@@ -259,7 +301,8 @@ describe("AssistantStore", () => {
 
   test("sendMessage creates Anthropic session lazily on first send", async () => {
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("hi");
     expect(s.getState().sessions[id]?.anthropicSessionId).toBe("asid");
     expect(s.getState().sessions[id]?.environmentId).toBe("eid");
@@ -268,7 +311,7 @@ describe("AssistantStore", () => {
   test("Anthropic session is reused across sends (createSession called once)", async () => {
     const apiMod = await import("#/lib/assistant-api");
     const s = createAssistantStore();
-    s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
     await s.getState().sendMessage("a");
     await s.getState().sendMessage("b");
     expect((apiMod.createSession as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
@@ -276,7 +319,7 @@ describe("AssistantStore", () => {
 
   test("text_delta accumulates into streaming.text and message_end commits to messages", async () => {
     const s = createAssistantStore();
-    s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
     await s.getState().sendMessage("hi");
     const sid = s.getState().selectedSessionId!;
     const msgs = s.getState().sessions[sid]!.messages;
@@ -293,7 +336,7 @@ describe("AssistantStore", () => {
       },
     );
     const s = createAssistantStore();
-    s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
     await s.getState().sendMessage("hi");
     expect(s.getState().streaming?.status).toBe("error");
   });
@@ -315,7 +358,8 @@ describe("AssistantStore", () => {
       },
     );
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     const p = s.getState().sendMessage("hi");
     // Allow the stream mock to enqueue.
     await new Promise<void>((r) => setTimeout(r, 0));
@@ -333,7 +377,8 @@ describe("AssistantStore", () => {
       new Error("network_down"),
     );
     const s = createAssistantStore();
-    const id = s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
+    const id = s.getState().selectedSessionId!;
     await s.getState().sendMessage("hi");
     expect(s.getState().sessions[id]!.messages).toHaveLength(0);
     expect(s.getState().streaming?.status).toBe("error");
@@ -376,7 +421,7 @@ describe("AssistantStore", () => {
     );
 
     const s = createAssistantStore();
-    s.getState().createSession();
+    s.getState().selectSessionForDoc("doc-test");
 
     // Start first send and let the mock enqueue events.
     const p1 = s.getState().sendMessage("first");
@@ -396,5 +441,34 @@ describe("AssistantStore", () => {
     await Promise.all([p1, p2]);
 
     expect(secondAbortFired).toBe(true);
+  });
+
+  // ── New tests for selectSessionForDoc ──────────────────────────────────────
+
+  test("selectSessionForDoc creates a new session if none exists for the doc", () => {
+    const store = createAssistantStore();
+    store.getState().selectSessionForDoc("doc1");
+    const id = store.getState().selectedSessionId!;
+    expect(store.getState().sessions[id].documentId).toBe("doc1");
+  });
+
+  test("selectSessionForDoc reuses an existing session for the same doc", () => {
+    const store = createAssistantStore();
+    store.getState().selectSessionForDoc("doc1");
+    const first = store.getState().selectedSessionId;
+    store.getState().selectSessionForDoc("doc1");
+    expect(store.getState().selectedSessionId).toBe(first);
+    expect(store.getState().order.length).toBe(1);
+  });
+
+  test("selectSessionForDoc switches to the doc's session", () => {
+    const store = createAssistantStore();
+    store.getState().selectSessionForDoc("doc1");
+    const a = store.getState().selectedSessionId;
+    store.getState().selectSessionForDoc("doc2");
+    const b = store.getState().selectedSessionId;
+    expect(a).not.toBe(b);
+    store.getState().selectSessionForDoc("doc1");
+    expect(store.getState().selectedSessionId).toBe(a);
   });
 });
