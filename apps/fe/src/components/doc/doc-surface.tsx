@@ -10,7 +10,18 @@ type SaveState = "idle" | "saving";
 export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolean) => void }) {
   const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
+  const selectDoc = useDocuments((s) => s.selectDoc);
   const query = useDocumentsQuery(user.id);
+
+  // When the list lands and nothing is selected (fresh load, or after the
+  // selected doc was deleted), default to the most recently created doc.
+  useEffect(() => {
+    if (selectedId !== null) return;
+    const list = query.data;
+    if (!list || list.length === 0) return;
+    selectDoc(list[list.length - 1].id);
+  }, [query.data, selectedId, selectDoc]);
+
   const doc = useMemo(
     () => query.data?.find((d) => d.id === selectedId) ?? null,
     [query.data, selectedId],

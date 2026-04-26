@@ -15,35 +15,44 @@ vi.mock("#/auth/auth-gate", async () => {
   };
 });
 
-vi.mock("#/lib/documents-api", () => ({
-  documentsApi: {
-    list: vi.fn(async () => [
-      {
-        id: "d1",
-        userId: "u1",
-        title: "Onboarding notes",
-        emoji: "📝",
-        tag: null,
-        contentJson: JSON.stringify({ type: "doc", content: [] }),
-        createdAt: 1,
-        updatedAt: 1,
-      },
-      {
-        id: "d2",
-        userId: "u1",
-        title: "Product principles",
-        emoji: "📐",
-        tag: null,
-        contentJson: JSON.stringify({ type: "doc", content: [] }),
-        createdAt: 2,
-        updatedAt: 2,
-      },
-    ]),
-    create: vi.fn(),
-    update: vi.fn(),
-    remove: vi.fn(),
-  },
-}));
+vi.mock("#/lib/documents-api", () => {
+  const rows = [
+    {
+      id: "d1",
+      userId: "u1",
+      title: "Onboarding notes",
+      emoji: "📝",
+      tag: null,
+      contentJson: JSON.stringify({ type: "doc", content: [] }),
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: "d2",
+      userId: "u1",
+      title: "Product principles",
+      emoji: "📐",
+      tag: null,
+      contentJson: JSON.stringify({ type: "doc", content: [] }),
+      createdAt: 2,
+      updatedAt: 2,
+    },
+  ];
+  return {
+    documentsApi: {
+      list: vi.fn(async () => rows),
+      create: vi.fn(),
+      // Return the existing row with a bumped updatedAt so the cache update in
+      // useUpdateDoc.send() finds a valid `row.id` even if the editor fires an
+      // onUpdate during mount.
+      update: vi.fn(async (_uid: string, id: string) => ({
+        ...(rows.find((r) => r.id === id) ?? rows[0]),
+        updatedAt: Date.now(),
+      })),
+      remove: vi.fn(),
+    },
+  };
+});
 
 function wrap(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
@@ -87,9 +96,11 @@ describe("<AppShell />", () => {
 
   test("shows documents from the server in the sidebar", async () => {
     renderShell();
+    // Both titles render in the sidebar; the auto-selected last doc also
+    // renders in the topbar h1, so "Product principles" appears twice.
     await waitFor(() => {
       screen.getByText("Onboarding notes");
-      screen.getByText("Product principles");
+      expect(screen.getAllByText("Product principles").length).toBeGreaterThanOrEqual(1);
     });
   });
 

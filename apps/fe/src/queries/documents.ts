@@ -108,11 +108,19 @@ export function useUpdateDoc(userId: string | null, docId: string | null) {
     await send();
   }, [send]);
 
+  // When docId or userId changes, flush any pending patch against the
+  // previous identity *before* the next render's `send` closure rebinds.
+  // The cleanup captures the `send` from the render that set this effect,
+  // so it sends with the previous (docId, userId).
   useEffect(
     () => () => {
-      if (timer.current) window.clearTimeout(timer.current);
+      if (timer.current) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      void send();
     },
-    [],
+    [docId, userId, send],
   );
 
   const subscribe = useCallback((cb: () => void) => {
