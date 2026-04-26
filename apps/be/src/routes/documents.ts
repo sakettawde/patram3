@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "../db/client";
 import { documents } from "../db/schema";
@@ -59,6 +59,35 @@ app.post("/", async (c) => {
 
   await getDb(c.env.DB).insert(documents).values(row);
   return c.json(row, 201);
+});
+
+app.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  const userId = c.get("userId");
+  const db = getDb(c.env.DB);
+
+  const body = (await c.req.json().catch(() => ({}))) as Partial<{
+    title: string;
+    emoji: string;
+    tag: string | null;
+    contentJson: unknown;
+  }>;
+
+  const patch: Record<string, unknown> = { updatedAt: Date.now() };
+  if (typeof body.title === "string") patch.title = body.title.trim() || "Untitled";
+  if (typeof body.emoji === "string" && body.emoji) patch.emoji = body.emoji;
+  if (body.tag === null) patch.tag = null;
+  else if (typeof body.tag === "string") patch.tag = body.tag;
+  if (body.contentJson !== undefined) patch.contentJson = JSON.stringify(body.contentJson);
+
+  const result = await db
+    .update(documents)
+    .set(patch)
+    .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+    .returning();
+
+  if (result.length === 0) return c.json({ error: "not_found" }, 404);
+  return c.json(result[0]);
 });
 
 export default app;
