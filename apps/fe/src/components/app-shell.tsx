@@ -11,7 +11,6 @@ export function AppShell() {
     if (typeof window === "undefined") return false;
     return window.innerWidth < 960;
   });
-  const [saving, setSaving] = useState(false);
   const assistantOpen = useAssistant((s) => s.open);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export function AppShell() {
     <div className="grid h-screen w-screen grid-cols-[auto_1fr] overflow-hidden bg-(--paper)">
       <Sidebar collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)} />
       <main className="flex h-screen min-w-0 flex-col overflow-hidden">
-        <Topbar saveState={saving ? "saving" : "idle"} />
+        <Topbar />
         <div className="flex min-h-0 flex-1">
           <aside
             aria-label="Assistant"
@@ -47,7 +46,7 @@ export function AppShell() {
             <div className="h-full w-full">{assistantOpen && <AssistantPanel />}</div>
           </aside>
           <div className="min-w-0 flex-1 overflow-y-auto">
-            <DocSurface onSavingChange={setSaving} />
+            <DocSurface />
           </div>
         </div>
       </main>

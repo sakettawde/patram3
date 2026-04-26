@@ -11,8 +11,9 @@ import { cn } from "#/lib/utils";
 import { useDeleteDoc, useDocumentsQuery } from "#/queries/documents";
 import { assistantStore, useAssistant } from "#/stores/assistant";
 import { useDocuments } from "#/stores/documents";
+import { useUi } from "#/stores/ui";
 
-export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
+export function Topbar() {
   const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
   const selectDoc = useDocuments((s) => s.selectDoc);
@@ -20,6 +21,7 @@ export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
   const doc = query.data?.find((d) => d.id === selectedId) ?? null;
   const deleteDoc = useDeleteDoc(user.id);
   const assistantOpen = useAssistant((s) => s.open);
+  const saving = useUi((s) => s.saving);
 
   const toggleAssistant = () => assistantStore.getState().toggleOpen();
 
@@ -42,7 +44,7 @@ export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
       <h1 className="truncate text-[13px] font-medium text-(--ink)">{doc.title}</h1>
 
       <div className="ml-auto flex items-center gap-3">
-        <SaveStatus state={saveState} savedAt={doc.updatedAt} />
+        <SaveStatus state={saving ? "saving" : "idle"} savedAt={doc.updatedAt} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

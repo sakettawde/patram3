@@ -24,3 +24,20 @@ describe("UiStore", () => {
     expect(b.getState().sidebarTab).toBe("sessions");
   });
 });
+
+import { uiStore } from "./ui";
+
+test("setSaving toggles the saving flag", () => {
+  uiStore.setState({ saving: false });
+  uiStore.getState().setSaving(true);
+  expect(uiStore.getState().saving).toBe(true);
+  uiStore.getState().setSaving(false);
+  expect(uiStore.getState().saving).toBe(false);
+});
+
+test("saving is not persisted across reloads", () => {
+  uiStore.getState().setSaving(true);
+  // partialize must not include `saving`.
+  const persisted = JSON.parse(localStorage.getItem("patram.ui.v1") ?? "{}");
+  expect(persisted.state?.saving).toBeUndefined();
+});

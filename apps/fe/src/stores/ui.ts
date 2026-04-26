@@ -7,6 +7,8 @@ export type SidebarTab = "docs" | "sessions";
 export type UiStore = {
   sidebarTab: SidebarTab;
   setSidebarTab: (tab: SidebarTab) => void;
+  saving: boolean;
+  setSaving: (saving: boolean) => void;
 };
 
 export function createUiStore(): StoreApi<UiStore> {
@@ -15,10 +17,13 @@ export function createUiStore(): StoreApi<UiStore> {
       (set) => ({
         sidebarTab: "docs",
         setSidebarTab: (tab) => set({ sidebarTab: tab }),
+        saving: false,
+        setSaving: (saving) => set({ saving }),
       }),
       {
         name: "patram.ui.v1",
         storage: createJSONStorage(() => localStorage),
+        // `saving` is intentionally omitted — it's transient request state.
         partialize: (s) => ({ sidebarTab: s.sidebarTab }),
       },
     ),

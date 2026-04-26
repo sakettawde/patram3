@@ -5,6 +5,7 @@ import { ReviewBar } from "#/components/editor/review-bar";
 import { useDocumentsQuery, useUpdateDoc } from "#/queries/documents";
 import { useDocuments } from "#/stores/documents";
 import { useAssistant } from "#/stores/assistant";
+import { uiStore } from "#/stores/ui";
 import { proposalsStore, useProposals, type Proposal } from "#/stores/proposals";
 import { markdownToHtml } from "#/lib/markdown-to-html";
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -16,7 +17,7 @@ type SaveState = "idle" | "saving";
 // Stable empty fallback — see the useProposals call below.
 const EMPTY_PROPOSALS: Proposal[] = [];
 
-export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolean) => void }) {
+export function DocSurface() {
   const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
   const selectDoc = useDocuments((s) => s.selectDoc);
@@ -49,8 +50,9 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
     () => "idle",
   );
   useEffect(() => {
-    onSavingChange(saveState === "saving");
-  }, [saveState, onSavingChange]);
+    uiStore.getState().setSaving(saveState === "saving");
+    return () => uiStore.getState().setSaving(false);
+  }, [saveState]);
 
   // Flush on tab close / route change.
   // Depend on `updater.flush` (a stable useCallback result), NOT `updater`.
