@@ -90,4 +90,18 @@ app.patch("/:id", async (c) => {
   return c.json(result[0]);
 });
 
+app.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const userId = c.get("userId");
+  const db = getDb(c.env.DB);
+
+  const result = await db
+    .delete(documents)
+    .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+    .returning({ id: documents.id });
+
+  if (result.length === 0) return c.json({ error: "not_found" }, 404);
+  return c.body(null, 204);
+});
+
 export default app;
