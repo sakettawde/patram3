@@ -7,6 +7,7 @@
     "cf-typegen": "vp exec wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "^4.12.14",
     "nanoid": "catalog:"

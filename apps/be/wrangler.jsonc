@@ -3,6 +3,9 @@
   "name": "patram3-be",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-23",
+  // Required secrets (set with `wrangler secret put`):
+  //   ANTHROPIC_API_KEY  - Anthropic API key (begins with "sk-ant-")
+  //   ANTHROPIC_AGENT_ID - id of the agent created in the Anthropic console
   "d1_databases": [
     {
       "binding": "DB",
