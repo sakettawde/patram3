@@ -13,6 +13,9 @@ import type { JSONContent } from "@tiptap/react";
 
 type SaveState = "idle" | "saving";
 
+// Stable empty fallback — see the useProposals call below.
+const EMPTY_PROPOSALS: Proposal[] = [];
+
 export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolean) => void }) {
   const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
@@ -72,7 +75,10 @@ export function DocSurface({ onSavingChange }: { onSavingChange: (saving: boolea
   const [lastSent, setLastSent] = useState<{ titleHeading: string }>({ titleHeading: "" });
 
   // Proposals + editor handle.
-  const proposals = useProposals((s) => (doc ? (s.byDoc[doc.id] ?? []) : []));
+  // The selector must return a stable reference when there are no proposals,
+  // otherwise Zustand notifies on every render (new `[]` literal each time)
+  // and we hit "Maximum update depth exceeded".
+  const proposals = useProposals((s) => (doc ? s.byDoc[doc.id] : undefined)) ?? EMPTY_PROPOSALS;
   const editorRef = useRef<TiptapEditor | null>(null);
 
   const onEditorReady = useCallback((ed: TiptapEditor) => {
