@@ -16,13 +16,13 @@ export function SidebarHeaderActions() {
     const row = await createDoc.mutateAsync({});
     selectDoc(row.id);
     assistantStore.getState().setOpen(true);
-    navigate({ to: "/" });
+    void navigate({ to: "/" });
   };
 
   const onNewDoc = async () => {
     const row = await createDoc.mutateAsync({});
     selectDoc(row.id);
-    navigate({ to: "/" });
+    void navigate({ to: "/" });
   };
 
   return (
