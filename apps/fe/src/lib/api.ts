@@ -10,10 +10,16 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+type Init = { headers?: Record<string, string> };
+
+async function request<T>(method: string, path: string, body?: unknown, init?: Init): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...init?.headers,
+  };
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
@@ -33,6 +39,8 @@ function safeParse(text: string): unknown {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>("GET", path),
-  post: <T>(path: string, body: unknown) => request<T>("POST", path, body),
+  get: <T>(path: string, init?: Init) => request<T>("GET", path, undefined, init),
+  post: <T>(path: string, body: unknown, init?: Init) => request<T>("POST", path, body, init),
+  patch: <T>(path: string, body: unknown, init?: Init) => request<T>("PATCH", path, body, init),
+  del: <T>(path: string, init?: Init) => request<T>("DELETE", path, undefined, init),
 };
