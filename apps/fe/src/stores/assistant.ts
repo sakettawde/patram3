@@ -6,11 +6,16 @@ import { pickReply } from "#/lib/mock-replies";
 
 export type ChatRole = "user" | "assistant";
 
+export type AttachmentMeta =
+  | { kind: "image" | "pdf"; fileId: string; name: string; size: number }
+  | { kind: "text"; name: string; size: number };
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
   createdAt: number;
+  attachments?: AttachmentMeta[];
 };
 
 export type ChatSession = {
@@ -19,6 +24,25 @@ export type ChatSession = {
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
+  anthropicSessionId: string | null;
+  environmentId: string | null;
+};
+
+export type StreamingActivity = {
+  id: string;
+  kind: "tool_use" | "tool_result" | "thinking" | "status";
+  label: string;
+  summary?: string;
+  at: number;
+};
+
+export type StreamingSlot = {
+  sessionId: string;
+  messageId: string;
+  text: string;
+  activity: StreamingActivity[];
+  status: "streaming" | "cancelled" | "error";
+  errorMessage?: string;
 };
 
 export type AssistantState = {
@@ -27,6 +51,7 @@ export type AssistantState = {
   sessions: Record<string, ChatSession>;
   order: string[];
   pendingSessionIds: Record<string, true>;
+  streaming: StreamingSlot | null;
 };
 
 export type AssistantActions = {
@@ -52,6 +77,8 @@ function newSession(): ChatSession {
     messages: [],
     createdAt: now,
     updatedAt: now,
+    anthropicSessionId: null,
+    environmentId: null,
   };
 }
 
@@ -70,6 +97,7 @@ export function createAssistantStore(): StoreApi<AssistantStore> {
         sessions: {},
         order: [],
         pendingSessionIds: {},
+        streaming: null,
 
         toggleOpen: () => set((st) => ({ open: !st.open })),
         setOpen: (open) => set({ open }),

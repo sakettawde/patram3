@@ -154,4 +154,56 @@ describe("AssistantStore", () => {
     const b = createAssistantStore();
     expect(b.getState().pendingSessionIds).toEqual({});
   });
+
+  test("newly created sessions have null anthropicSessionId/environmentId", () => {
+    const s = createAssistantStore();
+    const id = s.getState().createSession();
+    const sess = s.getState().sessions[id];
+    expect(sess?.anthropicSessionId).toBeNull();
+    expect(sess?.environmentId).toBeNull();
+  });
+
+  test("messages may carry attachments metadata", () => {
+    const s = createAssistantStore();
+    const id = s.getState().createSession();
+    s.setState((st) => {
+      const sess = st.sessions[id]!;
+      return {
+        sessions: {
+          ...st.sessions,
+          [id]: {
+            ...sess,
+            messages: [
+              ...sess.messages,
+              {
+                id: "m1",
+                role: "user",
+                content: "see this",
+                createdAt: 1,
+                attachments: [{ kind: "image", fileId: "f1", name: "x.png", size: 10 }],
+              },
+            ],
+          },
+        },
+      };
+    });
+    expect(s.getState().sessions[id]?.messages[0]?.attachments?.[0]?.kind).toBe("image");
+  });
+
+  test("streaming slot starts null and is not persisted", () => {
+    const a = createAssistantStore();
+    expect(a.getState().streaming).toBeNull();
+    a.setState({
+      streaming: {
+        sessionId: "s",
+        messageId: "m",
+        text: "hi",
+        activity: [],
+        status: "streaming",
+      },
+    });
+    // new instance from same storage → streaming reset
+    const b = createAssistantStore();
+    expect(b.getState().streaming).toBeNull();
+  });
 });
