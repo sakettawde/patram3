@@ -1,4 +1,5 @@
 import { MoreHorizontal, Sparkles } from "lucide-react";
+import { useUser } from "#/auth/auth-gate";
 import { SaveStatus } from "#/components/save-status";
 import {
   DropdownMenu,
@@ -7,13 +8,17 @@ import {
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { cn } from "#/lib/utils";
+import { useDeleteDoc, useDocumentsQuery } from "#/queries/documents";
 import { assistantStore, useAssistant } from "#/stores/assistant";
 import { useDocuments } from "#/stores/documents";
 
 export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
+  const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
-  const doc = useDocuments((s) => (s.selectedId ? s.docs[s.selectedId] : null));
-  const deleteDoc = useDocuments((s) => s.deleteDoc);
+  const selectDoc = useDocuments((s) => s.selectDoc);
+  const query = useDocumentsQuery(user.id);
+  const doc = query.data?.find((d) => d.id === selectedId) ?? null;
+  const deleteDoc = useDeleteDoc(user.id);
   const assistantOpen = useAssistant((s) => s.open);
 
   const toggleAssistant = () => assistantStore.getState().toggleOpen();
@@ -25,6 +30,11 @@ export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
       </header>
     );
   }
+
+  const onDelete = async () => {
+    await deleteDoc.mutateAsync(selectedId);
+    selectDoc(null);
+  };
 
   return (
     <header className="flex h-11 items-center gap-3 border-b border-(--rule) px-3">
@@ -44,7 +54,7 @@ export function Topbar({ saveState }: { saveState: "idle" | "saving" }) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuItem variant="destructive" onSelect={() => deleteDoc(selectedId)}>
+            <DropdownMenuItem variant="destructive" onSelect={() => void onDelete()}>
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>

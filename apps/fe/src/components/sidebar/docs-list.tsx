@@ -1,20 +1,26 @@
 import { Plus, Search } from "lucide-react";
+import { useUser } from "#/auth/auth-gate";
+import { useCreateDoc, useDeleteDoc, useDocumentsQuery } from "#/queries/documents";
 import { useDocuments } from "#/stores/documents";
 import { DocRow } from "./doc-row";
 import { SidebarSection } from "./sidebar-section";
 
 export function DocsList() {
-  const order = useDocuments((s) => s.order);
-  const docs = useDocuments((s) => s.docs);
+  const user = useUser();
   const selectedId = useDocuments((s) => s.selectedId);
   const selectDoc = useDocuments((s) => s.selectDoc);
-  const createDoc = useDocuments((s) => s.createDoc);
+  const query = useDocumentsQuery(user.id);
+  const createDoc = useCreateDoc(user.id);
+  const _deleteDoc = useDeleteDoc(user.id); // wired for the future delete UI; v1 has no UI button.
+  void _deleteDoc;
 
-  const sortedIds = [...order].sort((a, b) => {
-    const da = docs[a]?.updatedAt ?? 0;
-    const db = docs[b]?.updatedAt ?? 0;
-    return db - da;
-  });
+  const docs = query.data ?? [];
+  // Server returns docs sorted by createdAt ASC. Honour that exactly.
+
+  const onCreate = async () => {
+    const row = await createDoc.mutateAsync({});
+    selectDoc(row.id);
+  };
 
   return (
     <>
@@ -33,9 +39,10 @@ export function DocsList() {
       <div className="px-3 pb-3">
         <button
           type="button"
-          onClick={() => createDoc()}
+          onClick={onCreate}
+          disabled={createDoc.isPending}
           aria-label="New document"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-(--ink-soft) hover:bg-(--paper-soft) hover:text-(--ink)"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-(--ink-soft) hover:bg-(--paper-soft) hover:text-(--ink) disabled:opacity-60"
         >
           <Plus className="size-3.5" />
           <span>New document</span>
@@ -43,19 +50,15 @@ export function DocsList() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-2">
-        <SidebarSection label="Documents" count={sortedIds.length}>
-          {sortedIds.map((id) => {
-            const d = docs[id];
-            if (!d) return null;
-            return (
-              <DocRow
-                key={id}
-                title={d.title}
-                active={selectedId === id}
-                onClick={() => selectDoc(id)}
-              />
-            );
-          })}
+        <SidebarSection label="Documents" count={docs.length}>
+          {docs.map((d) => (
+            <DocRow
+              key={d.id}
+              title={d.title}
+              active={selectedId === d.id}
+              onClick={() => selectDoc(d.id)}
+            />
+          ))}
         </SidebarSection>
       </div>
     </>

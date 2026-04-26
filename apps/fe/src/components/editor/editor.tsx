@@ -3,13 +3,13 @@ import { useEffect, useMemo, useRef } from "react";
 import { BubbleMenu } from "./bubble-menu";
 import { buildExtensions } from "./extensions";
 
-const SAVE_DEBOUNCE_MS = 600;
+export type EditorChange = { json: JSONContent; wordCount: number; title: string };
 
 export type EditorProps = {
   docId: string;
   initialContent: JSONContent;
-  onUpdate: (args: { json: JSONContent; wordCount: number; title: string }) => void;
-  onSavingChange: (saving: boolean) => void;
+  onChange: (change: EditorChange) => void;
+  onBlur?: () => void;
 };
 
 function extractTitle(json: JSONContent): string {
@@ -24,9 +24,12 @@ function extractTitle(json: JSONContent): string {
   return "";
 }
 
-export function Editor({ docId, initialContent, onUpdate, onSavingChange }: EditorProps) {
+export function Editor({ docId, initialContent, onChange, onBlur }: EditorProps) {
   const extensions = useMemo(() => buildExtensions(), []);
-  const saveTimer = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const editor = useEditor(
     {
@@ -39,31 +42,26 @@ export function Editor({ docId, initialContent, onUpdate, onSavingChange }: Edit
           class:
             "prose prose-slate max-w-none focus:outline-none text-[16px] leading-[1.7] text-(--ink)",
         },
+        handleDOMEvents: {
+          blur: () => {
+            onBlur?.();
+            return false;
+          },
+        },
       },
       onUpdate: ({ editor: ed }) => {
-        onSavingChange(true);
-        if (saveTimer.current) window.clearTimeout(saveTimer.current);
-        saveTimer.current = window.setTimeout(() => {
-          const json = ed.getJSON();
-          const title = extractTitle(json);
-          const storage = ed.storage as unknown as Record<
-            string,
-            { words?: () => number } | undefined
-          >;
-          const words = storage.characterCount?.words?.() ?? 0;
-          onUpdate({ json, wordCount: words, title });
-          onSavingChange(false);
-        }, SAVE_DEBOUNCE_MS);
+        const json = ed.getJSON();
+        const title = extractTitle(json);
+        const storage = ed.storage as unknown as Record<
+          string,
+          { words?: () => number } | undefined
+        >;
+        const words = storage.characterCount?.words?.() ?? 0;
+        onChangeRef.current({ json, wordCount: words, title });
       },
     },
     [docId],
   );
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    };
-  }, []);
 
   if (!editor) return null;
   return (
